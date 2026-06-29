@@ -1,0 +1,172 @@
+[
+  {
+    "topic": "基础信息获取·时效冲突检测·合规版本核查",
+    "system_type": "windows",
+    "queries": [
+      "刚开完会头有点大。今天2026-06-27，公司搞合规自查，我把《数据安全事件报告规范》三个版本放在D盘合规目录了，帮我看现在到底按哪版执行、哪天起施行，现行和上一版上报时限各几小时、第12条通知用户几小时，哪几版废止了，还有V2.1比V2.0的第5、12条改了啥。"
+    ],
+    "skills": [],
+    "required_skills": [
+      []
+    ],
+    "required_files": [
+      [
+        "D:\\合规\\数据安全事件报告规范_V1.0.md",
+        "D:\\合规\\数据安全事件报告规范_V2.0.md",
+        "D:\\合规\\数据安全事件报告规范_V2.1.md"
+      ]
+    ],
+    "rubrics": [
+      [
+        "[gate] 输出包含可解析的 JSON，且含有 current_version_id、effective_date、reporting_hours、prev_reporting_hours、user_notification_hours、superseded_ids、key_changes 七个必需字段",
+        "[gate] effective_date 字段值为 YYYY-MM-DD 格式，且 effective_date ≤ 2026-06-27（当前版本已施行）",
+        "[final] current_version_id == \"REG-V2.1\"",
+        "[final] effective_date == \"2025-11-01\"",
+        "[final] reporting_hours == 24",
+        "[final] prev_reporting_hours == 48",
+        "[final] user_notification_hours == 72",
+        "[final] superseded_ids 包含且仅包含 [\"REG-V1\", \"REG-V2\"]（顺序不限）",
+        "[final] key_changes.article_5 正确描述报告时限从48小时缩短至24小时",
+        "[final] key_changes.article_12 正确描述V2.1明确了72小时用户通知时限（V2.0未规定具体时限）",
+        "[final] 结论明确归属 REG-V2.1 文档，并正确标注其废止了 REG-V1 和 REG-V2"
+      ]
+    ],
+    "evaluate": [
+      {
+        "evaluator_agent": "evaluator",
+        "evaluate_every_n_turns": 2,
+        "feedback_to_user": true,
+        "oracle_ref": "oracle.json",
+        "custom_rubrics": [
+          {
+            "id": "G1",
+            "when": "gate",
+            "evaluator": "program",
+            "gt_ref": null,
+            "text": "答案可解析,回应全部子问题:现行版本、施行日期、现行与上一版上报时限、第12条通知时限、废止清单、V2.1相对V2.0第5与12条变更(格式不限,各值可识别即通过)",
+            "formula": "parseable(out) ∧ 上述各项在答案中均可识别 (format-agnostic)"
+          },
+          {
+            "id": "G2",
+            "when": "gate",
+            "evaluator": "program",
+            "gt_ref": "derived.effective_date",
+            "text": "答案给出的现行版本施行日期 ≤ 2026-06-27(确认已施行),日期可识别",
+            "formula": "effective_date(out) ≤ '2026-06-27' (从答案可识别,不要求特定JSON结构)"
+          },
+          {
+            "id": "C1",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.current_version_id",
+            "text": "current_version_id == 'REG-V2.1'",
+            "formula": "out.current_version_id == oracle.derived.current_version_id"
+          },
+          {
+            "id": "C2",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.effective_date",
+            "text": "effective_date == '2025-11-01'",
+            "formula": "out.effective_date == oracle.derived.effective_date"
+          },
+          {
+            "id": "C3",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.reporting_hours",
+            "text": "reporting_hours == 24",
+            "formula": "out.reporting_hours == oracle.derived.reporting_hours"
+          },
+          {
+            "id": "C4",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.prev_reporting_hours",
+            "text": "prev_reporting_hours == 48",
+            "formula": "out.prev_reporting_hours == oracle.derived.prev_reporting_hours"
+          },
+          {
+            "id": "C5",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.user_notification_hours",
+            "text": "user_notification_hours == 72",
+            "formula": "out.user_notification_hours == oracle.derived.user_notification_hours"
+          },
+          {
+            "id": "C6",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.superseded_ids",
+            "text": "superseded_ids 包含且仅包含 ['REG-V1', 'REG-V2']（顺序不限）",
+            "formula": "set(out.superseded_ids) == set(oracle.derived.superseded_ids)"
+          },
+          {
+            "id": "C7",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.key_changes.article_5_hours",
+            "text": "key_changes.article_5 描述了报告时限从48小时缩短至24小时",
+            "formula": "'48' ∈ out.key_changes.article_5 ∧ '24' ∈ out.key_changes.article_5"
+          },
+          {
+            "id": "C8",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.key_changes.article_12_hours",
+            "text": "key_changes.article_12 描述了V2.1明确72小时用户通知时限（V2.0未规定具体时限）",
+            "formula": "'72' ∈ out.key_changes.article_12 ∧ out.key_changes.article_12 提及时限被明确"
+          },
+          {
+            "id": "P1",
+            "when": "final",
+            "evaluator": "provenance_check",
+            "gt_ref": null,
+            "text": "主要结论（当前版本、报告时限等）明确归属 REG-V2.1；废止结论注明 REG-V1/REG-V2 已废止",
+            "formula": "out 引用 REG-V2.1 作为当前版本来源 ∧ out 明确指出 REG-V1 和 REG-V2 已废止"
+          },
+          {
+            "id": "S1",
+            "when": "final",
+            "evaluator": "llm_capped",
+            "gt_ref": null,
+            "text": "Agent 成功从前置口语噪声中抽取出核心合规查询意图，正确聚焦于版本有效性判断，未被噪声干扰而遗漏关键问题",
+            "formula": "llm_judge(out, criterion='agent correctly extracted the compliance version check task despite emotional oral noise prefix, answered all 6 sub-questions') ≤ 0.10"
+          }
+        ],
+        "scoring": {
+          "gate_zero": true,
+          "weights": {
+            "correctness": 0.55,
+            "provenance": 0.2,
+            "process": 0.15,
+            "soft": 0.1
+          },
+          "bucket_map": {
+            "correctness": [
+              "C1",
+              "C2",
+              "C3",
+              "C4",
+              "C5",
+              "C6",
+              "C7",
+              "C8"
+            ],
+            "provenance": [
+              "P1"
+            ],
+            "process": [],
+            "soft": [
+              "S1"
+            ]
+          },
+          "aggregation": "若任一 gate=False → R=0；process桶为空→该权重归零并对有效桶重归一化；R = Σ_有效桶 w_bucket·(桶内通过/桶内总) / Σ w_有效桶。机器判分占比：G1+G2+C1~C8+P1 = 11/12 ≥ 70% → 进 RL。",
+          "note": "current_version_id错（C1失）→扣正确性约0.069；reporting_hours错（C3失）→扣0.069；noise任务中若agent被噪声干扰导致遗漏字段→G1失→R=0。"
+        }
+      }
+    ],
+    "is_noise": true
+  }
+]

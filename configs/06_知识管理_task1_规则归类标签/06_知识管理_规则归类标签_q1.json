@@ -1,0 +1,68 @@
+{
+  "_comment": "AutomationConfig·真实文件环境(UserSimulator batch_generate 产出的真实用户电脑文件)。D/ 为真实文件树(笔记库/待归类笔记.md、笔记库/分类规则.md),MAP_Windows.json 为文件系统映射,env_config.json 为机器快照。solver 需用文件/代码工具读真实 .md 文件并按规则归类。oracle 由 python 按规则精算。",
+  "system": {
+    "platform": [
+      "windows"
+    ],
+    "python": "3.12",
+    "tools": []
+  },
+  "input_dir": {
+    "skill_dir": "skill_localize/skills_library",
+    "agent_dir": "agents",
+    "user_dir": {
+      "path": "configs/06_知识管理_task1_规则归类标签",
+      "profile_file": "user_profile_6_产品知识管理员.json",
+      "map_file": "MAP_Windows"
+    }
+  },
+  "agents": [
+    {
+      "name": "assistant1",
+      "role": "solver",
+      "config": [
+        "TOOLS.md"
+      ],
+      "skills": [],
+      "system_prompt": null,
+      "model": "deepseek-v4-pro"
+    },
+    {
+      "name": "evaluator",
+      "config": [],
+      "skills": [],
+      "model": "gemini-3-flash-preview",
+      "model_provider": "custom-yibuapi-com"
+    }
+  ],
+  "_note_evaluator": "evaluator 已由轨迹生产管线提供,这里只在 queries[].evaluate 里按名字引用并交 rubrics。",
+  "queries": [
+    {
+      "agent_name": "assistant1",
+      "text": "笔记库里那 8 篇会议和研究笔记标签乱了,分类规则在同目录《分类规则.md》(按优先级、哪条先命中按哪条算)。帮我照着给这 8 篇重新归类、更新标签,按 id 顺序给我 JSON,每篇带 id、category、tags。",
+      "is_noise": false,
+      "session_name": "query1",
+      "timeout": 3600,
+      "evaluate": {
+        "evaluator_agent": "evaluator",
+        "evaluate_every_n_turns": 2,
+        "feedback_to_user": true,
+        "oracle_ref": "oracle.json",
+        "rubrics_ref": "user_queries.json#/0/evaluate/0/custom_rubrics",
+        "scoring": {
+          "gate_zero": true,
+          "weights": {
+            "correctness": 0.7,
+            "provenance": 0.0,
+            "process": 0.2,
+            "soft": 0.1
+          }
+        }
+      }
+    }
+  ],
+  "gateway_ws_url": "ws://127.0.0.1:18789/gateway",
+  "api_key": null,
+  "workspace_base": "~/.openclaw/workspace",
+  "simulator_config": "configs/user_proxy_model.json"
+}

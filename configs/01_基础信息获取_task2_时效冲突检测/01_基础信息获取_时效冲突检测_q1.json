@@ -1,0 +1,68 @@
+{
+  "_comment": "AutomationConfig(generate_configs.py 口径)。真实文件环境：三份《数据安全事件报告规范》规范放在 D/合规/ 真实文件树，MAP_Windows.json 为文件系统映射，env_config.json 为机器快照；query 带一句口语 noise 开场（任务加噪组）。solver 需用文件/代码工具读真实 .md。evaluator 已在轨迹管线里；这里只按名字引用。",
+  "system": {
+    "platform": [
+      "windows"
+    ],
+    "python": "3.12",
+    "tools": []
+  },
+  "input_dir": {
+    "skill_dir": "skill_localize/skills_library",
+    "agent_dir": "agents",
+    "user_dir": {
+      "path": "configs/01_基础信息获取_task2_时效冲突检测",
+      "profile_file": "user_profile_合规专员_时效冲突.json",
+      "map_file": "MAP_Windows"
+    }
+  },
+  "agents": [
+    {
+      "name": "assistant1",
+      "role": "solver",
+      "config": [
+        "TOOLS.md"
+      ],
+      "skills": [],
+      "system_prompt": null,
+      "model": "deepseek-v4-pro"
+    },
+    {
+      "name": "evaluator",
+      "config": [],
+      "skills": [],
+      "model": "gemini-3-flash-preview",
+      "model_provider": "custom-yibuapi-com"
+    }
+  ],
+  "_note_evaluator": "evaluator 不在这里定义；它由轨迹管线提供。我们只在 queries[].evaluate 里按名字引用它并交出 custom_rubrics。",
+  "queries": [
+    {
+      "agent_name": "assistant1",
+      "text": "刚开完会头有点大。今天2026-06-27，公司搞合规自查，我把《数据安全事件报告规范》三个版本放在D盘合规目录了，帮我看现在到底按哪版执行、哪天起施行，现行和上一版上报时限各几小时、第12条通知用户几小时，哪几版废止了，还有V2.1比V2.0的第5、12条改了啥。",
+      "is_noise": false,
+      "session_name": "query1",
+      "timeout": 3600,
+      "evaluate": {
+        "evaluator_agent": "evaluator",
+        "evaluate_every_n_turns": 2,
+        "feedback_to_user": true,
+        "oracle_ref": "oracle.json",
+        "rubrics_ref": "user_queries.json#/0/evaluate/0/custom_rubrics",
+        "scoring": {
+          "gate_zero": true,
+          "weights": {
+            "correctness": 0.55,
+            "provenance": 0.2,
+            "process": 0.15,
+            "soft": 0.1
+          }
+        }
+      }
+    }
+  ],
+  "gateway_ws_url": "ws://127.0.0.1:18789/gateway",
+  "api_key": null,
+  "workspace_base": "~/.openclaw/workspace",
+  "simulator_config": "configs/user_proxy_model.json"
+}

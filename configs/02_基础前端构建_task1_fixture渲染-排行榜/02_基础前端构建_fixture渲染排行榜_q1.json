@@ -1,0 +1,68 @@
+{
+  "_comment": "AutomationConfig(generate_configs.py 口径)。fixture数据内嵌在query中，无文件环境→platform=[]。solver只需输出HTML代码，evaluator检查代码文本中的DOM结构/属性/数值。",
+  "system": {
+    "platform": [
+      "windows"
+    ],
+    "python": "3.12",
+    "tools": []
+  },
+  "input_dir": {
+    "skill_dir": "skill_localize/skills_library",
+    "agent_dir": "agents",
+    "user_dir": {
+      "path": "configs/02_基础前端构建_task1_fixture渲染-排行榜",
+      "profile_file": "user_profile_01_前端工程师_排行榜.json",
+      "map_file": "MAP_Windows"
+    }
+  },
+  "agents": [
+    {
+      "name": "assistant1",
+      "role": "solver",
+      "config": [
+        "TOOLS.md"
+      ],
+      "skills": [],
+      "system_prompt": null,
+      "model": "deepseek-v4-pro"
+    },
+    {
+      "name": "evaluator",
+      "config": [],
+      "skills": [],
+      "model": "gemini-3-flash-preview",
+      "model_provider": "custom-yibuapi-com"
+    }
+  ],
+  "_note_evaluator": "evaluator 不在此定义，由管线提供。我们在 queries[].evaluate 里按名字引用并传入 custom_rubrics。",
+  "queries": [
+    {
+      "agent_name": "assistant1",
+      "text": "我电脑 D 盘里有个销售业绩的数据文件（D:\\工作\\销售排行榜\\2026销售业绩Q1-Q3.csv），八个人三个季度的数字。帮我写个单文件 HTML 排行榜、双击就能在浏览器打开，别依赖任何 CDN。三个季度加起来当总分、按总分从高到低排名；同分要并列同名次，后面那档直接跳号（比如俩人并列第 1，下一位就是第 3，没有第 2）。表格加个 caption 写「2026年Q1-Q3销售排行榜」，每行带上 data-rank 和 data-total 方便我写测试，table 上加 role=\"table\" 和 aria-label=\"销售排行榜\" 把无障碍过了。对了，375px 那种窄屏别出横向滚动条。",
+      "is_noise": false,
+      "session_name": "query1",
+      "timeout": 3600,
+      "evaluate": {
+        "evaluator_agent": "evaluator",
+        "evaluate_every_n_turns": 2,
+        "feedback_to_user": true,
+        "oracle_ref": "oracle.json",
+        "rubrics_ref": "user_queries.json#/0/evaluate/0/custom_rubrics",
+        "scoring": {
+          "gate_zero": true,
+          "weights": {
+            "correctness": 0.55,
+            "provenance": 0.0,
+            "process": 0.15,
+            "soft": 0.1
+          }
+        }
+      }
+    }
+  ],
+  "gateway_ws_url": "ws://127.0.0.1:18789/gateway",
+  "api_key": null,
+  "workspace_base": "~/.openclaw/workspace",
+  "simulator_config": "configs/user_proxy_model.json"
+}

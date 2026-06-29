@@ -1,0 +1,159 @@
+[
+  {
+    "topic": "科研数据分析·描述统计与Pearson相关分析·教育年限工作经验月薪调查数据",
+    "system_type": "windows",
+    "queries": [
+      "我D盘论文数据文件夹里有个《调研数据.xlsx》，20个受访者的受教育年限、工龄和月薪。帮我算下这三项各自的均值和样本标准差，再看看两两之间（学历跟月薪、工龄跟月薪、学历跟工龄）的相关性，哪对显著哪对不显著。结果我要写进毕业论文的，得准。"
+    ],
+    "skills": [],
+    "required_skills": [
+      []
+    ],
+    "required_files": [
+      [
+        "D:\\论文数据\\调研数据.xlsx"
+      ]
+    ],
+    "rubrics": [
+      [
+        "[gate] 输出包含edu_years、work_exp、monthly_wage三个变量的均值或相关系数等数值结果（可识别为数字）",
+        "[gate] 只使用允许工具（web搜索、在线计算器、内部推理），无登录/付费工具",
+        "[gate] 计算使用n=20（不少报或多报样本量）",
+        "[final] monthly_wage的样本均值在[8059,8061]内（标准值8060.0）",
+        "[final] edu_years与monthly_wage的Pearson相关系数在[0.938,0.958]内（标准值0.9483，容差±0.01）",
+        "[final] work_exp与monthly_wage的Pearson相关系数在[0.288,0.318]内（标准值0.3031，容差±0.015）",
+        "[final] 正确判断edu_years↔monthly_wage在α=0.05下显著（p<0.05）",
+        "[final] 正确判断work_exp↔monthly_wage在α=0.05下不显著（p≥0.05，标准p=0.194）",
+        "[per_turn] 展示了计算方法或公式（如Pearson公式、Python代码、或分步计算过程）",
+        "[per_turn] 正确识别n=20并应用于std计算（ddof=1）",
+        "[final] 计算结果可追溯（给出了足够的中间步骤或工具调用记录使结果可验证）"
+      ]
+    ],
+    "evaluate": [
+      {
+        "evaluator_agent": "evaluator",
+        "evaluate_every_n_turns": 2,
+        "feedback_to_user": true,
+        "oracle_ref": "oracle.json",
+        "custom_rubrics": [
+          {
+            "id": "G1",
+            "when": "gate",
+            "evaluator": "program",
+            "gt_ref": null,
+            "text": "输出包含三个变量的均值或相关系数等数值结果",
+            "formula": "parseable(out) ∧ ∃ numeric_result ∈ out: (edu_years | work_exp | monthly_wage) × (mean | std | correlation)"
+          },
+          {
+            "id": "G2",
+            "when": "gate",
+            "evaluator": "program",
+            "gt_ref": null,
+            "text": "只使用允许工具（读取本地文件、代码执行/openpyxl、在线计算器、内部推理），无登录/付费工具",
+            "formula": "tools_used(traj) ⊆ {file_read, code_interpreter, web_search, open_url, internal_reasoning}"
+          },
+          {
+            "id": "G3",
+            "when": "gate",
+            "evaluator": "program",
+            "gt_ref": "real_facts.data_n",
+            "text": "计算基于n=20（样本量正确）",
+            "formula": "n_used(out) == 20 ∨ not_explicitly_stated(out)"
+          },
+          {
+            "id": "C1",
+            "when": "final",
+            "evaluator": "program",
+            "gt_ref": "derived.mean_wage",
+            "text": "monthly_wage样本均值在[8059,8061]内（标准值8060.0）",
+            "formula": "|parse_num(out, 'mean.*wage|wage.*mean') - 8060.0| ≤ 1.0"
+          },
+          {
+            "id": "C2",
+            "when": "final",
+            "evaluator": "program",
+            "gt_ref": "derived.r_edu_wage",
+            "text": "edu_years↔monthly_wage的Pearson相关系数在[0.938,0.958]内（标准值0.9483）",
+            "formula": "|parse_r(out, 'edu.*wage|wage.*edu') - 0.9483| ≤ 0.01"
+          },
+          {
+            "id": "C3",
+            "when": "final",
+            "evaluator": "program",
+            "gt_ref": "derived.r_exp_wage",
+            "text": "work_exp↔monthly_wage的Pearson相关系数在[0.288,0.318]内（标准值0.3031）",
+            "formula": "|parse_r(out, 'exp.*wage|wage.*exp') - 0.3031| ≤ 0.015"
+          },
+          {
+            "id": "C4",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.edu_wage_significant_at_05",
+            "text": "正确判断edu_years↔monthly_wage在α=0.05下显著（p<0.05）",
+            "formula": "out 明确指出 edu_years与monthly_wage相关 显著(significant/p<0.05/p<0.001)"
+          },
+          {
+            "id": "C5",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.exp_wage_significant_at_05",
+            "text": "正确判断work_exp↔monthly_wage在α=0.05下不显著（p≥0.05）",
+            "formula": "out 明确指出 work_exp与monthly_wage相关 不显著(not significant/p>0.05/p=0.19)"
+          },
+          {
+            "id": "PT1",
+            "when": "per_turn",
+            "evaluator": "program",
+            "gt_ref": null,
+            "text": "展示了计算方法或公式（如Pearson公式、Python代码、或分步计算过程）",
+            "formula": "∃ step ∈ traj: step.content ∋ (formula | code | Pearson | Σ | sqrt)"
+          },
+          {
+            "id": "PT2",
+            "when": "per_turn",
+            "evaluator": "program",
+            "gt_ref": "real_facts.data_n",
+            "text": "正确识别n=20并应用于std计算（ddof=1）",
+            "formula": "traj mentions n=20 ∧ ddof=1 (or equivalent sample std formula)"
+          },
+          {
+            "id": "P1",
+            "when": "final",
+            "evaluator": "provenance_check",
+            "gt_ref": null,
+            "text": "计算结果可追溯：给出足够的中间步骤或工具调用使结果可独立验证",
+            "formula": "out contains: (computation steps ∨ code snippet ∨ online_tool_link) such that results are reproducible"
+          }
+        ],
+        "scoring": {
+          "gate_zero": true,
+          "weights": {
+            "correctness": 0.55,
+            "provenance": 0.2,
+            "process": 0.15,
+            "soft": 0.1
+          },
+          "bucket_map": {
+            "correctness": [
+              "C1",
+              "C2",
+              "C3",
+              "C4",
+              "C5"
+            ],
+            "provenance": [
+              "P1"
+            ],
+            "process": [
+              "PT1",
+              "PT2"
+            ],
+            "soft": []
+          },
+          "aggregation": "若任一 gate(G1/G2/G3)=False → R=0；否则 R = Σ_bucket w_bucket·(桶内通过/桶内总) / Σ w_有效桶。soft=0条→有效桶权重合计0.90，全过 R=1.00。关键分差点：C2(r_edu_wage精确度) + C5(exp_wage不显著判断)，错漏者各失0.11。"
+        }
+      }
+    ],
+    "is_noise": false
+  }
+]

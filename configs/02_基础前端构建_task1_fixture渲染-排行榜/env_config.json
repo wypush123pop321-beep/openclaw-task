@@ -1,0 +1,390 @@
+{
+  "system": {
+    "os": "Windows 10 专业版",
+    "os_version": "22H2 (19045.3803)",
+    "username": "chenzixuan",
+    "display_name": "陈子轩",
+    "hostname": "CHEN-DEV",
+    "timezone": "China Standard Time (UTC+8)",
+    "language": "zh-CN",
+    "install_date": "2023-01-15",
+    "last_boot": "2024-12-19 09:12:35",
+    "product_key_partial": "XXXXX-XXXXX-XXXXX-XXXXX-W269N"
+  },
+  "hardware": {
+    "cpu": "Intel Core i5-10400 @ 2.90GHz (6C/12T)",
+    "ram_gb": 16,
+    "storage": [
+      {
+        "drive": "C:",
+        "label": "系统",
+        "type": "NVMe SSD",
+        "size_gb": 512,
+        "free_gb": 245
+      },
+      {
+        "drive": "D:",
+        "label": "工作盘",
+        "type": "SATA SSD",
+        "size_gb": 1000,
+        "free_gb": 467
+      },
+      {
+        "drive": "E:",
+        "label": "备份",
+        "type": "SATA HDD",
+        "size_gb": 2000,
+        "free_gb": 1523
+      }
+    ],
+    "display": "1920x1080 @75Hz AOC 24英寸 IPS",
+    "gpu": "NVIDIA GeForce GTX 1650 4GB",
+    "network_adapters": [
+      "Realtek RTL8822CE 802.11ac Wireless",
+      "Realtek PCIe GbE Family Controller"
+    ]
+  },
+  "installed_software": [
+    {
+      "name": "Visual Studio Code",
+      "version": "1.85.1",
+      "install_date": "2023-01-16",
+      "category": "代码编辑器",
+      "publisher": "Microsoft Corporation"
+    },
+    {
+      "name": "Google Chrome",
+      "version": "120.0.6099.130",
+      "install_date": "2023-01-16",
+      "category": "网络浏览",
+      "publisher": "Google LLC"
+    },
+    {
+      "name": "Git",
+      "version": "2.43.0",
+      "install_date": "2023-01-16",
+      "category": "版本控制",
+      "publisher": "The Git Development Community"
+    },
+    {
+      "name": "Node.js",
+      "version": "20.10.0 LTS",
+      "install_date": "2023-01-17",
+      "category": "运行时环境",
+      "publisher": "OpenJS Foundation"
+    },
+    {
+      "name": "Figma",
+      "version": "116.16.4",
+      "install_date": "2023-02-10",
+      "category": "设计工具",
+      "publisher": "Figma, Inc."
+    },
+    {
+      "name": "微信",
+      "version": "3.9.8.25",
+      "install_date": "2023-01-16",
+      "category": "通讯社交",
+      "publisher": "腾讯科技(深圳)有限公司"
+    },
+    {
+      "name": "企业微信",
+      "version": "4.1.16",
+      "install_date": "2023-01-18",
+      "category": "办公协同",
+      "publisher": "腾讯科技(深圳)有限公司"
+    },
+    {
+      "name": "腾讯QQ",
+      "version": "9.8.9.28887",
+      "install_date": "2023-01-17",
+      "category": "通讯社交",
+      "publisher": "深圳市腾讯计算机系统有限公司"
+    },
+    {
+      "name": "Windows Terminal",
+      "version": "1.18.3181.0",
+      "install_date": "2023-01-17",
+      "category": "终端工具",
+      "publisher": "Microsoft Corporation"
+    },
+    {
+      "name": "Postman",
+      "version": "10.21.0",
+      "install_date": "2023-03-05",
+      "category": "接口调试",
+      "publisher": "Postman, Inc."
+    },
+    {
+      "name": "Docker Desktop",
+      "version": "4.26.1",
+      "install_date": "2023-04-12",
+      "category": "容器工具",
+      "publisher": "Docker Inc."
+    },
+    {
+      "name": "WPS Office 2019",
+      "version": "11.1.0.15120",
+      "install_date": "2023-01-20",
+      "category": "办公软件",
+      "publisher": "珠海金山办公软件有限公司"
+    },
+    {
+      "name": "钉钉",
+      "version": "7.1.0.11",
+      "install_date": "2023-02-01",
+      "category": "办公协同",
+      "publisher": "钉钉(中国)信息技术有限公司"
+    },
+    {
+      "name": "百度网盘",
+      "version": "7.38.0.6",
+      "install_date": "2023-01-19",
+      "category": "云存储",
+      "publisher": "北京百度网讯科技有限公司"
+    },
+    {
+      "name": "搜狗输入法",
+      "version": "14.3.0.9129",
+      "install_date": "2023-01-16",
+      "category": "输入法",
+      "publisher": "搜狗科技发展有限公司"
+    },
+    {
+      "name": "360安全卫士",
+      "version": "13.1.0.2008",
+      "install_date": "2023-01-16",
+      "category": "系统安全",
+      "publisher": "北京奇虎科技有限公司"
+    },
+    {
+      "name": "7-Zip",
+      "version": "23.01",
+      "install_date": "2023-01-18",
+      "category": "压缩工具",
+      "publisher": "Igor Pavlov"
+    },
+    {
+      "name": "Notepad++",
+      "version": "8.6",
+      "install_date": "2023-01-18",
+      "category": "文本编辑器",
+      "publisher": "Don Ho"
+    },
+    {
+      "name": "网易云音乐",
+      "version": "2.10.12.201026",
+      "install_date": "2023-07-05",
+      "category": "影音娱乐",
+      "publisher": "杭州网易云音乐科技有限公司"
+    },
+    {
+      "name": "Steam",
+      "version": "2023.12.20",
+      "install_date": "2023-08-14",
+      "category": "游戏平台",
+      "publisher": "Valve Corporation"
+    },
+    {
+      "name": "PotPlayer",
+      "version": "231102 (1.7.22003)",
+      "install_date": "2023-02-12",
+      "category": "影音播放",
+      "publisher": "Kakao Corp."
+    },
+    {
+      "name": "迅雷11",
+      "version": "11.5.1.2058",
+      "install_date": "2023-02-08",
+      "category": "下载工具",
+      "publisher": "深圳市迅雷网络技术有限公司"
+    }
+  ],
+  "browser": {
+    "default": "Google Chrome",
+    "version": "120.0.6099.130",
+    "bookmarks": [
+      "MDN Web Docs - developer.mozilla.org",
+      "Can I use - caniuse.com",
+      "掘金 - juejin.cn",
+      "GitHub - github.com",
+      "Stack Overflow - stackoverflow.com",
+      "npm 包搜索 - npmjs.com",
+      "Vue.js 文档 - vuejs.org",
+      "React 文档 - react.dev",
+      "TypeScript 文档 - typescriptlang.org",
+      "Vite 文档 - vitejs.dev",
+      "CSS-Tricks - css-tricks.com",
+      "正则可视化 - regex101.com",
+      "JSON 格式化 - jsonformatter.org",
+      "公司内网 GitLab - gitlab.internal",
+      "公司 Jira 看板 - jira.internal",
+      "ARIA 实践指南 - w3.org/WAI/ARIA",
+      "字节跳动技术博客 - tech.bytedance.com",
+      "阿里妈妈 FUI 设计 - fusion.design",
+      "哔哩哔哩 - bilibili.com",
+      "知乎 - zhihu.com",
+      "京东商城 - jd.com",
+      "淘宝网 - taobao.com",
+      "支付宝 - alipay.com"
+    ],
+    "extensions": [
+      "Vue.js devtools",
+      "React Developer Tools",
+      "JSON Viewer",
+      "Wappalyzer - 技术栈识别",
+      "AdBlock - 广告拦截器",
+      "Octotree - GitHub 代码树",
+      "沙拉查词 - 聚合词典划词翻译",
+      "OneTab - 标签页管理"
+    ],
+    "history_summary": "技术文档与API参考(34%), 代码托管及问答社区(26%), 公司内网协作平台(20%), 设计与原型工具(10%), 其他(10%)"
+  },
+  "recent_files": [
+    "D:\\工作\\销售排行榜\\2026销售业绩Q1-Q3.csv",
+    "D:\\工作\\projects\\activity-signup\\index.html",
+    "D:\\工作\\projects\\leaderboard\\src\\App.vue",
+    "C:\\Users\\chenzixuan\\Documents\\需求评审\\Q1组件排期.xlsx",
+    "D:\\工作\\projects\\admin-dashboard\\package.json",
+    "C:\\Users\\chenzixuan\\Desktop\\表单交互稿_v3.fig",
+    "D:\\工作\\snippets\\排序与并列名次.js",
+    "D:\\工作\\projects\\leaderboard\\README.md",
+    "C:\\Users\\chenzixuan\\Downloads\\接口文档_v2.pdf",
+    "D:\\工作\\notes\\aria可访问性自查清单.md"
+  ],
+  "desktop_shortcuts": [
+    "Visual Studio Code",
+    "Google Chrome",
+    "Git Bash",
+    "Windows Terminal",
+    "Node.js command prompt",
+    "Postman",
+    "Figma",
+    "微信",
+    "企业微信",
+    "腾讯QQ",
+    "WPS Office",
+    "百度网盘",
+    "网易云音乐",
+    "Steam",
+    "此电脑",
+    "回收站"
+  ],
+  "startup_programs": [
+    {
+      "name": "微信",
+      "path": "C:\\Program Files (x86)\\Tencent\\WeChat\\WeChat.exe",
+      "enabled": true
+    },
+    {
+      "name": "企业微信",
+      "path": "C:\\Program Files (x86)\\WXWork\\WXWork.exe",
+      "enabled": true
+    },
+    {
+      "name": "搜狗输入法",
+      "path": "C:\\Program Files (x86)\\SogouInput\\SogouCloud.exe",
+      "enabled": true
+    },
+    {
+      "name": "360安全卫士",
+      "path": "C:\\Program Files\\360\\360Safe\\safemon\\360Tray.exe",
+      "enabled": true
+    },
+    {
+      "name": "Docker Desktop",
+      "path": "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe",
+      "enabled": false
+    },
+    {
+      "name": "百度网盘",
+      "path": "C:\\Users\\chenzixuan\\AppData\\Roaming\\BaiduYunGuanjia\\BaiduYunGuanjia.exe",
+      "enabled": true
+    },
+    {
+      "name": "NVIDIA GeForce Experience",
+      "path": "C:\\Program Files\\NVIDIA Corporation\\NVIDIA GeForce Experience\\NVIDIA GeForce Experience.exe",
+      "enabled": true
+    },
+    {
+      "name": "Realtek HD Audio Manager",
+      "path": "C:\\Program Files\\Realtek\\Audio\\HDA\\RtkNGUI64.exe",
+      "enabled": true
+    }
+  ],
+  "scheduled_tasks": [
+    {
+      "name": "代码仓库自动备份",
+      "schedule": "每天 23:30",
+      "action": "将D盘工作目录增量备份到E盘",
+      "enabled": true
+    },
+    {
+      "name": "系统垃圾清理",
+      "schedule": "每周日 22:00",
+      "action": "运行360安全卫士清理功能",
+      "enabled": true
+    },
+    {
+      "name": "依赖更新检查",
+      "schedule": "每周一 10:00",
+      "action": "提醒检查项目依赖与安全告警",
+      "enabled": true
+    },
+    {
+      "name": "Windows更新检查",
+      "schedule": "每周三 02:00",
+      "action": "检查并安装Windows系统更新",
+      "enabled": false
+    }
+  ],
+  "network": {
+    "hostname": "CHEN-DEV",
+    "ip_address": "192.168.1.125",
+    "dns": [
+      "192.168.1.1",
+      "114.114.114.114"
+    ],
+    "wifi_profiles": [
+      "Office-5G",
+      "Office-2.4G",
+      "CHEN-Home-WiFi6",
+      "陈子轩的iPhone",
+      "邻居家WiFi"
+    ],
+    "proxy": {
+      "enabled": false,
+      "host": "",
+      "port": 0
+    }
+  },
+  "environment_variables": {
+    "USERPROFILE": "C:\\Users\\chenzixuan",
+    "APPDATA": "C:\\Users\\chenzixuan\\AppData\\Roaming",
+    "LOCALAPPDATA": "C:\\Users\\chenzixuan\\AppData\\Local",
+    "TEMP": "C:\\Users\\chenzixuan\\AppData\\Local\\Temp",
+    "TMP": "C:\\Users\\chenzixuan\\AppData\\Local\\Temp",
+    "PUBLIC": "C:\\Users\\Public",
+    "PROGRAMFILES": "C:\\Program Files",
+    "PROGRAMFILES(X86)": "C:\\Program Files (x86)",
+    "COMMONPROGRAMFILES": "C:\\Program Files\\Common Files",
+    "SYSTEMROOT": "C:\\Windows",
+    "NODE_PATH": "C:\\Program Files\\nodejs\\node_modules"
+  },
+  "registry_notes": "已注册组件包括: 微软雅黑、思源黑体、JetBrains Mono、Fira Code 等编程字体; DirectX 12运行时; Visual C++ 2015-2022可再发行组件包; .NET Framework 4.8; Node.js 运行时及 npm; Git for Windows 组件; 腾讯系软件COM组件(QQ、微信协议支持); 搜狗输入法输入法引擎; 360安全组件及驱动; WPS Office文档处理组件",
+  "windows_features": [
+    "Windows Media Player",
+    "适用于 Linux 的 Windows 子系统 (WSL2)",
+    ".NET Framework 3.5",
+    ".NET Framework 4.8 高级服务",
+    "Windows 照片查看器",
+    "打印和文档服务",
+    "远程桌面连接",
+    "Windows Defender防火墙",
+    "虚拟打印机 Microsoft Print to PDF",
+    "DirectX 12",
+    "Windows Hello 人脸识别",
+    "蓝牙支持",
+    "Hyper-V 平台"
+  ]
+}
