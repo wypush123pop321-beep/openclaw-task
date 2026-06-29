@@ -185,6 +185,11 @@ class EvaluateConfig(BaseModel):
     )
     log_evaluations: bool = Field(True, description="是否把每次评估落盘到 evaluator_use.log")
     review_subdir: str = Field("_under_review", description="推进 evaluator 工作区的被审查文件子目录")
+    isolate_eval_files: bool = Field(
+        True,
+        description="开关:任务执行期间把本 query 的 oracle/rubrics 从磁盘隔离(执行前删除→结束后还原)。"
+                    "True=隔离(防被测 agent 读到答案);False=不隔离(调试用,文件保留在盘)",
+    )
 
     # 新增:外部引用(相对 config 文件目录,由 ConfigLoader 解引用 pass 加载并填充运行时字段)
     oracle_ref: Optional[str] = Field(None, description="ground-truth 文件相对路径,供 oracle_cmp 比对")
@@ -195,6 +200,8 @@ class EvaluateConfig(BaseModel):
     structured_rubrics: List[Rubric] = Field(default_factory=list, exclude=True)
     oracle_data: Optional[dict] = Field(None, exclude=True)
     scoring_spec: Optional[ScoringSpec] = Field(None, exclude=True)
+    # 文件隔离 vault:{绝对路径: 原始文本};解引用时留存,供执行期删除/还原(整文件粒度)。
+    file_vault: Dict[str, str] = Field(default_factory=dict, exclude=True)
 
     def rubric_items(self) -> List[Rubric]:
         """统一返回结构化 rubric:优先 structured_rubrics,否则把旧式字符串 rubrics 归一。"""

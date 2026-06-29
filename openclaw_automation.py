@@ -538,6 +538,38 @@ def _replace_variables(text: str, results: Dict[str, ExecutionResult]) -> str:
     return re.sub(pattern, replacer, text)
 
 
+def _isolate_eval_files(evaluate: Optional[EvaluateConfig]) -> None:
+    """任务执行前:把该 query 的 oracle/rubrics 文件从磁盘删除(内容已在 file_vault 中)。
+
+    被测 agent 跑在能访问真实文件系统的环境;删除后其磁盘上不含答案/验收清单。
+    由 evaluate.isolate_eval_files 开关控制;关闭时不删。幂等:文件已不在则跳过(missing_ok)。
+    """
+    if evaluate is None or not evaluate.isolate_eval_files:
+        return
+    for path in evaluate.file_vault:
+        try:
+            Path(path).unlink(missing_ok=True)
+            logger.debug("[文件隔离] 已删除: %s", path)
+        except OSError as e:  # noqa: BLE001
+            logger.warning("[文件隔离] 删除失败(忽略): %s (%s)", path, e)
+
+
+def _restore_eval_files(evaluate: Optional[EvaluateConfig]) -> None:
+    """任务结束后:把 file_vault 中的原始字节写回原路径(best-effort,纯调试便利)。
+
+    容器化运行下即使不还原亦无影响;写回失败仅记日志,不抛错、不中断主流程。
+    以原始字节逐字写回 → 与原文件逐字节一致(git 无 diff)。开关关闭时不还原(本就没删)。
+    """
+    if evaluate is None or not evaluate.isolate_eval_files:
+        return
+    for path, raw_text in evaluate.file_vault.items():
+        try:
+            Path(path).write_text(raw_text, encoding="utf-8")
+            logger.debug("[文件隔离] 已还原: %s", path)
+        except OSError as e:  # noqa: BLE001
+            logger.warning("[文件隔离] 还原失败(忽略): %s (%s)", path, e)
+
+
 async def process_turn(
     client: OpenClawClient,
     query: QueryItem,
@@ -874,6 +906,11 @@ async def execute_queries(
             else create_evaluator(query.evaluate, client, _RUN_ID, base_session, eval_sys_prompt)
         )
 
+        # 文件隔离:被测 agent 执行前,把本 query 的 oracle/rubrics 从磁盘删除(内容已在内存)。
+        # 仅对被评估的 query 生效(evaluator 为 None 的 noise query 不隔离)。
+        if evaluator is not None:
+            _isolate_eval_files(query.evaluate)
+
         for turn in range(1, max_turn + 1 if query_simulator else 2):
             logger.debug("[Q%d] %s", turn, current_query)
             agent = client.get_agent(query.agent_name, session_name)
@@ -945,6 +982,10 @@ async def execute_queries(
             if query_simulator is not None:
                 trajectory.outcome = "max_turn"
                 logger.warning("达到最大轮次 %d,任务未完成", max_turn)
+
+        # 文件隔离收尾:任务结束后把 oracle/rubrics 原始字节写回(best-effort,纯调试便利)。
+        if evaluator is not None:
+            _restore_eval_files(query.evaluate)
 
         results[f"result_{query.agent_name}"] = last_result
 
@@ -1128,16 +1169,22 @@ def _resolve_evaluate_refs(config: "AutomationConfig", config_dir: Path) -> None
             op = (config_dir / ev.oracle_ref)
             if not op.exists():
                 raise FileNotFoundError(f"evaluate.oracle_ref 不存在: {op}")
-            ev.oracle_data = json.loads(op.read_text(encoding="utf-8"))
+            oracle_text = op.read_text(encoding="utf-8")
+            ev.oracle_data = json.loads(oracle_text)
+            # 留存原始字节+绝对路径,供执行期隔离/还原(整文件粒度,逐字节回写)
+            ev.file_vault[str(op.resolve())] = oracle_text
 
         if ev.rubrics_ref:
             file_part, _, ptr = ev.rubrics_ref.partition("#")
             rp = (config_dir / file_part)
             if not rp.exists():
                 raise FileNotFoundError(f"evaluate.rubrics_ref 不存在: {rp}")
-            raw = json.loads(rp.read_text(encoding="utf-8"))
+            rubrics_text = rp.read_text(encoding="utf-8")
+            raw = json.loads(rubrics_text)
             arr = _resolve_json_pointer(raw, ptr) if ptr else raw
             ev.structured_rubrics = [Rubric.from_raw(r, i) for i, r in enumerate(arr, 1)]
+            # 片段引用也按整文件留存(删除/还原以整文件为单位)
+            ev.file_vault[str(rp.resolve())] = rubrics_text
 
             # scoring 合成优先级(design):rubrics_ref 指向的 evaluate 块为权威源(含完整 bucket_map),
             # q1.json 内联 scoring 作覆盖/兜底。仅当内联缺 bucket_map 时才去权威源补。
