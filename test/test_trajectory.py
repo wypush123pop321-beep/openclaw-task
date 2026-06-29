@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from openclaw_sdk.core.types import ExecutionResult, GeneratedFile, ToolCall
 
-from trajectory import build_turn_record, capture_file_evidence
+from trajectory import build_turn_record, capture_file_evidence, extract_tool_calls
 
 
 def test_normal_turn_captures_tool_calls():
@@ -127,10 +127,62 @@ def test_discovers_workspace_file_when_self_report_empty():
     print("✓ 自报为空时扫描本地工作区发现新文件并读到磁盘内容")
 
 
+def test_extract_tool_calls_from_history():
+    """2.3: 从 OC chat_history 解析 toolCall/toolResult 并按 id 配对(黄金样本同构)。"""
+    messages = [
+        {"role": "user", "content": [{"type": "text", "text": "建文件并读"}]},
+        {"role": "assistant", "content": [
+            {"type": "toolCall", "id": "c1", "name": "write",
+             "arguments": {"file_path": "probe.txt", "content": "hello-probe"}},
+            {"type": "text", "text": "\n"},
+            {"type": "toolCall", "id": "c2", "name": "read",
+             "arguments": {"file_path": "probe.txt"}},
+        ]},
+        {"role": "toolResult", "toolCallId": "c1", "toolName": "write",
+         "content": [{"type": "text", "text": "Successfully wrote 11 bytes to probe.txt"}], "isError": False},
+        {"role": "toolResult", "toolCallId": "c2", "toolName": "read",
+         "content": [{"type": "text", "text": "hello-probe"}], "isError": False},
+        {"role": "assistant", "content": [{"type": "text", "text": "内容是 hello-probe"}]},
+    ]
+    calls = extract_tool_calls(messages)
+    assert len(calls) == 2, f"应解析出 2 次工具调用,实得 {len(calls)}"
+    assert calls[0].tool == "write"
+    assert "probe.txt" in calls[0].input and "hello-probe" in calls[0].input
+    assert calls[0].output == "Successfully wrote 11 bytes to probe.txt"
+    assert calls[1].tool == "read" and calls[1].output == "hello-probe"
+    print("✓ 从 chat_history 解析 toolCall/toolResult 并按 id 配对")
+
+
+def test_extract_tool_calls_edge_cases():
+    """2.3: 无工具步骤→空;缺 result→output None;isError→[error] 标注。"""
+    # 纯对话无工具调用
+    assert extract_tool_calls([
+        {"role": "user", "content": [{"type": "text", "text": "hi"}]},
+        {"role": "assistant", "content": [{"type": "text", "text": "hello"}]},
+    ]) == []
+    # toolCall 缺对应 toolResult → output 为 None
+    only_call = extract_tool_calls([
+        {"role": "assistant", "content": [
+            {"type": "toolCall", "id": "x", "name": "read", "arguments": {"p": 1}}]},
+    ])
+    assert len(only_call) == 1 and only_call[0].output is None
+    # isError → output 带 [error] 前缀
+    err = extract_tool_calls([
+        {"role": "assistant", "content": [
+            {"type": "toolCall", "id": "e", "name": "read", "arguments": {}}]},
+        {"role": "toolResult", "toolCallId": "e", "toolName": "read",
+         "content": [{"type": "text", "text": "No such file"}], "isError": True},
+    ])
+    assert err[0].output.startswith("[error]") and "No such file" in err[0].output
+    print("✓ 边界:无工具→空 / 缺 result→None / isError→标注")
+
+
 if __name__ == "__main__":
     test_normal_turn_captures_tool_calls()
     test_fallback_turn_marked_incomplete()
     test_disk_truth_overrides_claim()
     test_file_fetch_error_degrades_not_negative()
     test_discovers_workspace_file_when_self_report_empty()
+    test_extract_tool_calls_from_history()
+    test_extract_tool_calls_edge_cases()
     print("\n全部通过 ✅ (test_trajectory)")

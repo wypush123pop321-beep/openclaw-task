@@ -1,0 +1,193 @@
+[
+  {
+    "topic": "知识管理·规则归类·批量标签更新",
+    "system_type": "windows",
+    "queries": [
+      "笔记库里那 8 篇会议和研究笔记标签乱了,分类规则在同目录《分类规则.md》(按优先级、哪条先命中按哪条算)。帮我照着给这 8 篇重新归类、更新标签,按 id 顺序给我 JSON,每篇带 id、category、tags。"
+    ],
+    "skills": [],
+    "required_skills": [
+      []
+    ],
+    "required_files": [
+      [
+        "D:\\笔记库\\待归类笔记.md"
+      ],
+      [
+        "D:\\笔记库\\分类规则.md"
+      ]
+    ],
+    "rubrics": [
+      [
+        "[gate] 输出可解析为 JSON 数组",
+        "[gate] 数组包含恰好 8 个条目且所有 id 均为 N-001~N-008",
+        "[final] N-001 category = 产品设计",
+        "[final] N-002 category = 性能优化",
+        "[final] N-003 category = 产品设计",
+        "[final] N-004 category = 安全与合规",
+        "[final] N-005 category = 数据分析",
+        "[final] N-006 category = 前端工程",
+        "[final] N-007 category = 竞品研究",
+        "[final] N-008 category = 技术债务",
+        "[final] N-001 tags 集合 == {产品, 用户}",
+        "[final] N-004 tags 集合 == {安全, 技术}",
+        "[final] N-005 tags 集合 == {数据, 增长}",
+        "[per_turn] 每个条目均包含 id、category、tags 三个字段"
+      ]
+    ],
+    "evaluate": [
+      {
+        "evaluator_agent": "evaluator",
+        "evaluate_every_n_turns": 2,
+        "feedback_to_user": true,
+        "oracle_ref": "oracle.json",
+        "custom_rubrics": [
+          {
+            "id": "G1",
+            "when": "gate",
+            "evaluator": "program",
+            "gt_ref": null,
+            "text": "答案可解析,对 8 篇笔记逐篇给出归类结果(每篇含 category 与 tags;JSON/表格/列表皆可)",
+            "formula": "parseable(out) ∧ 8篇均可识别出 category 与 tags (format-agnostic)"
+          },
+          {
+            "id": "G2",
+            "when": "gate",
+            "evaluator": "program",
+            "gt_ref": "derived.all_ids",
+            "text": "答案覆盖全部 8 篇(N-001~N-008),不多不少",
+            "formula": "{ids addressed in out} == {N-001..N-008}"
+          },
+          {
+            "id": "C1",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.category_by_id.N-001",
+            "text": "N-001 category = 产品设计",
+            "formula": "out_item(N-001).category == oracle.derived.category_by_id['N-001']"
+          },
+          {
+            "id": "C2",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.category_by_id.N-002",
+            "text": "N-002 category = 性能优化",
+            "formula": "out_item(N-002).category == oracle.derived.category_by_id['N-002']"
+          },
+          {
+            "id": "C3",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.category_by_id.N-003",
+            "text": "N-003 category = 产品设计",
+            "formula": "out_item(N-003).category == oracle.derived.category_by_id['N-003']"
+          },
+          {
+            "id": "C4",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.category_by_id.N-004",
+            "text": "N-004 category = 安全与合规",
+            "formula": "out_item(N-004).category == oracle.derived.category_by_id['N-004']"
+          },
+          {
+            "id": "C5",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.category_by_id.N-005",
+            "text": "N-005 category = 数据分析",
+            "formula": "out_item(N-005).category == oracle.derived.category_by_id['N-005']"
+          },
+          {
+            "id": "C6",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.category_by_id.N-006",
+            "text": "N-006 category = 前端工程",
+            "formula": "out_item(N-006).category == oracle.derived.category_by_id['N-006']"
+          },
+          {
+            "id": "C7",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.category_by_id.N-007",
+            "text": "N-007 category = 竞品研究",
+            "formula": "out_item(N-007).category == oracle.derived.category_by_id['N-007']"
+          },
+          {
+            "id": "C8",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.category_by_id.N-008",
+            "text": "N-008 category = 技术债务",
+            "formula": "out_item(N-008).category == oracle.derived.category_by_id['N-008']"
+          },
+          {
+            "id": "T1",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.tags_by_id.N-001",
+            "text": "N-001 tags 集合 == {产品,用户}",
+            "formula": "set(out_item(N-001).tags) == set(oracle.derived.tags_by_id['N-001'])"
+          },
+          {
+            "id": "T2",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.tags_by_id.N-004",
+            "text": "N-004 tags 集合 == {安全,技术}",
+            "formula": "set(out_item(N-004).tags) == set(oracle.derived.tags_by_id['N-004'])"
+          },
+          {
+            "id": "T3",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.tags_by_id.N-005",
+            "text": "N-005 tags 集合 == {数据,增长}",
+            "formula": "set(out_item(N-005).tags) == set(oracle.derived.tags_by_id['N-005'])"
+          },
+          {
+            "id": "PT1",
+            "when": "per_turn",
+            "evaluator": "program",
+            "gt_ref": null,
+            "text": "每个条目均包含 id、category、tags 三个必需字段",
+            "formula": "∀ item ∈ out: 'id' ∈ item ∧ 'category' ∈ item ∧ 'tags' ∈ item"
+          }
+        ],
+        "scoring": {
+          "gate_zero": true,
+          "weights": {
+            "correctness": 0.7,
+            "provenance": 0.0,
+            "process": 0.2,
+            "soft": 0.1
+          },
+          "bucket_map": {
+            "correctness": [
+              "C1",
+              "C2",
+              "C3",
+              "C4",
+              "C5",
+              "C6",
+              "C7",
+              "C8",
+              "T1",
+              "T2",
+              "T3"
+            ],
+            "provenance": [],
+            "process": [
+              "PT1"
+            ],
+            "soft": []
+          },
+          "aggregation": "若任一 gate=False → R=0。否则 R = Σ_bucket w_bucket·(桶内通过/桶内总) / Σ w_有效桶。provenance/soft 桶均空→有效桶=correctness(0.70)+process(0.20)=0.90,自归一化后全过R=1.00。机器判分占比100%→诚信→进RL。",
+          "note": "全部 correctness 分项为 oracle_cmp 程序判;process PT1 为 program 判;soft 桶空。任意 category 写错将显著拉低 correctness 桶分。"
+        }
+      }
+    ],
+    "is_noise": false
+  }
+]

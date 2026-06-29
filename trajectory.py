@@ -1,7 +1,7 @@
 """逐轮轨迹证据捕获(能力: trajectory-capture)。
 
 在多轮对话执行中,为每个 turn 留存 agent 的可核验证据:
-- `tool_calls`(内存直取,免费)
+- `tool_calls`(由调用方从 OC `chat_history` 解析后传入;SDK 的 `ExecutionResult.tool_calls` 对服务端自主 agent 恒空)
 - 生成文件(以 `agents.files.get(被测 agentId)` 读取的**磁盘真相**为准,而非采信
   `ExecutionResult.files` 自报)
 并标注证据完整性:经 `history_fallback` 兜底、只剩文本的 turn 标 `evidence_incomplete`。
@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any, Optional
@@ -170,26 +171,85 @@ def _render_turn_compact(t: TurnRecord) -> str:
 # 捕获辅助
 # ============================================================================
 
+def _block_text(content: Any) -> str:
+    """把 OC 消息的 content(块数组或字符串)拍平为纯文本。"""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = [b["text"] for b in content if isinstance(b, dict) and isinstance(b.get("text"), str)]
+        return "".join(parts)
+    return "" if content is None else str(content)
+
+
+def extract_tool_calls(messages: list[dict[str, Any]]) -> list[ToolCallEvidence]:
+    """从 OC `chat_history` 消息解析工具调用证据(能力: trajectory-capture)。
+
+    OC 结构:`role==assistant` 的 `content` 块中 `type=="toolCall"`(含 `id`/`name`/
+    `arguments`)为一次调用;`role=="toolResult"` 消息(含 `toolCallId`/`toolName`/
+    `content`/`isError`)为其返回。按 `id`↔`toolCallId` 配对,保持调用出现顺序。
+
+    入参 messages 应为**本轮新增**的消息子集(增量截取由调用方负责)。
+    SDK 的 `ExecutionResult.tool_calls` 对服务端自主 agent 恒空,故采集改以本函数为准。
+    """
+    # 1. 按 toolCallId 索引所有 toolResult
+    results_by_id: dict[str, dict[str, Any]] = {}
+    for m in messages:
+        if isinstance(m, dict) and m.get("role") == "toolResult":
+            cid = m.get("toolCallId")
+            if cid:
+                results_by_id[cid] = m
+    # 2. 顺序遍历 assistant 消息里的 toolCall 块,配对其结果
+    calls: list[ToolCallEvidence] = []
+    for m in messages:
+        if not isinstance(m, dict) or m.get("role") != "assistant":
+            continue
+        content = m.get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict) or block.get("type") != "toolCall":
+                continue
+            cid = block.get("id")
+            name = block.get("name") or block.get("toolName") or ""
+            args = block.get("arguments")
+            input_str = (
+                json.dumps(args, ensure_ascii=False)
+                if isinstance(args, (dict, list))
+                else ("" if args is None else str(args))
+            )
+            output: Optional[str] = None
+            res = results_by_id.get(cid) if cid else None
+            if res is not None:
+                output = _block_text(res.get("content"))
+                if res.get("isError"):
+                    output = f"[error] {output}"
+            calls.append(ToolCallEvidence(tool=name, input=input_str, output=output))
+    return calls
+
+
 def build_turn_record(
     turn: int,
     user_input: str,
     result: ExecutionResult,
     evidence_incomplete: bool,
+    tool_calls: Optional[list[ToolCallEvidence]] = None,
 ) -> TurnRecord:
     """从 ExecutionResult 构建 TurnRecord(纯内存,不触网)。
 
-    tool_calls 直取;files 仅记录声称的文件名(checked=False),磁盘真相由
-    `capture_file_evidence` 在需要时补齐。
+    tool_calls 优先取调用方从 OC `chat_history` 解析的结果(`extract_tool_calls`);
+    未提供时回退 `ExecutionResult.tool_calls`(对服务端自主 agent 恒空,仅作兼容)。
+    files 仅记录声称的文件名(checked=False),磁盘真相由 `capture_file_evidence` 补齐。
     """
-    tool_calls = [
-        ToolCallEvidence(
-            tool=tc.tool,
-            input=tc.input,
-            output=tc.output,
-            duration_ms=tc.duration_ms,
-        )
-        for tc in (result.tool_calls or [])
-    ]
+    if tool_calls is None:
+        tool_calls = [
+            ToolCallEvidence(
+                tool=tc.tool,
+                input=tc.input,
+                output=tc.output,
+                duration_ms=tc.duration_ms,
+            )
+            for tc in (result.tool_calls or [])
+        ]
     files = [FileEvidence(name=(gf.name or gf.path or "")) for gf in (result.files or [])]  # gf = generated_file
     return TurnRecord(
         turn=turn,

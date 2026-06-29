@@ -1,0 +1,374 @@
+{
+  "system": {
+    "os": "Windows 10 专业版",
+    "os_version": "22H2 (19045.3803)",
+    "username": "linhaifeng",
+    "display_name": "林海峰",
+    "hostname": "LIN-COMPLIANCE",
+    "timezone": "China Standard Time (UTC+8)",
+    "language": "zh-CN",
+    "install_date": "2023-01-15",
+    "last_boot": "2026-06-27 08:45:12",
+    "product_key_partial": "XXXXX-XXXXX-XXXXX-XXXXX-W269N"
+  },
+  "hardware": {
+    "cpu": "Intel Core i5-10400 @ 2.90GHz (6C/12T)",
+    "ram_gb": 16,
+    "storage": [
+      {
+        "drive": "C:",
+        "label": "系统",
+        "type": "NVMe SSD",
+        "size_gb": 512,
+        "free_gb": 245
+      },
+      {
+        "drive": "D:",
+        "label": "合规资料",
+        "type": "SATA SSD",
+        "size_gb": 1000,
+        "free_gb": 612
+      },
+      {
+        "drive": "E:",
+        "label": "归档备份",
+        "type": "SATA HDD",
+        "size_gb": 2000,
+        "free_gb": 1684
+      }
+    ],
+    "display": "1920x1080 @75Hz AOC 24英寸 IPS",
+    "gpu": "NVIDIA GeForce GTX 1650 4GB",
+    "network_adapters": [
+      "Realtek RTL8822CE 802.11ac Wireless",
+      "Realtek PCIe GbE Family Controller"
+    ]
+  },
+  "installed_software": [
+    {
+      "name": "WPS Office 2019",
+      "version": "11.1.0.15120",
+      "install_date": "2023-01-20",
+      "category": "办公软件",
+      "publisher": "珠海金山办公软件有限公司"
+    },
+    {
+      "name": "Microsoft Office 专业版 2021",
+      "version": "16.0.14332.20255",
+      "install_date": "2023-02-15",
+      "category": "办公软件",
+      "publisher": "Microsoft Corporation"
+    },
+    {
+      "name": "Adobe Acrobat DC",
+      "version": "23.006.20360",
+      "install_date": "2023-03-08",
+      "category": "PDF文档",
+      "publisher": "Adobe Inc."
+    },
+    {
+      "name": "福昕PDF阅读器",
+      "version": "12.1.1.15289",
+      "install_date": "2023-03-09",
+      "category": "PDF文档",
+      "publisher": "福建福昕软件开发股份有限公司"
+    },
+    {
+      "name": "北大法宝法律检索客户端",
+      "version": "6.2.3",
+      "install_date": "2023-04-01",
+      "category": "法律检索",
+      "publisher": "北京北大英华科技有限公司"
+    },
+    {
+      "name": "企业微信",
+      "version": "4.1.6.6020",
+      "install_date": "2023-01-18",
+      "category": "办公协同",
+      "publisher": "腾讯科技(深圳)有限公司"
+    },
+    {
+      "name": "微信",
+      "version": "3.9.8.25",
+      "install_date": "2023-01-16",
+      "category": "通讯社交",
+      "publisher": "腾讯科技(深圳)有限公司"
+    },
+    {
+      "name": "钉钉",
+      "version": "7.1.0.11",
+      "install_date": "2023-02-01",
+      "category": "办公协同",
+      "publisher": "钉钉(中国)信息技术有限公司"
+    },
+    {
+      "name": "腾讯会议",
+      "version": "3.19.0.401",
+      "install_date": "2023-02-20",
+      "category": "视频会议",
+      "publisher": "腾讯科技(深圳)有限公司"
+    },
+    {
+      "name": "腾讯QQ",
+      "version": "9.8.9.28887",
+      "install_date": "2023-01-17",
+      "category": "通讯社交",
+      "publisher": "深圳市腾讯计算机系统有限公司"
+    },
+    {
+      "name": "Google Chrome",
+      "version": "120.0.6099.130",
+      "install_date": "2023-01-16",
+      "category": "网络浏览",
+      "publisher": "Google LLC"
+    },
+    {
+      "name": "Typora",
+      "version": "1.8.10",
+      "install_date": "2023-05-12",
+      "category": "文本编辑",
+      "publisher": "typora.io"
+    },
+    {
+      "name": "Visual Studio Code",
+      "version": "1.85.1",
+      "install_date": "2023-06-02",
+      "category": "开发工具",
+      "publisher": "Microsoft Corporation"
+    },
+    {
+      "name": "Python 3.12",
+      "version": "3.12.1",
+      "install_date": "2023-06-02",
+      "category": "开发工具",
+      "publisher": "Python Software Foundation"
+    },
+    {
+      "name": "搜狗输入法",
+      "version": "14.3.0.9129",
+      "install_date": "2023-01-16",
+      "category": "输入法",
+      "publisher": "搜狗科技发展有限公司"
+    },
+    {
+      "name": "火绒安全软件",
+      "version": "5.0.7.3",
+      "install_date": "2023-01-16",
+      "category": "系统安全",
+      "publisher": "北京火绒网络科技有限公司"
+    },
+    {
+      "name": "7-Zip",
+      "version": "23.01",
+      "install_date": "2023-01-18",
+      "category": "压缩工具",
+      "publisher": "Igor Pavlov"
+    },
+    {
+      "name": "百度网盘",
+      "version": "7.38.0.6",
+      "install_date": "2023-01-19",
+      "category": "云存储",
+      "publisher": "北京百度网讯科技有限公司"
+    },
+    {
+      "name": "有道词典",
+      "version": "9.2.36",
+      "install_date": "2023-03-22",
+      "category": "翻译工具",
+      "publisher": "网易有道信息技术(北京)有限公司"
+    },
+    {
+      "name": "向日葵远程控制",
+      "version": "15.2.1.62220",
+      "install_date": "2023-09-20",
+      "category": "远程协助",
+      "publisher": "上海贝锐信息科技股份有限公司"
+    }
+  ],
+  "browser": {
+    "default": "Google Chrome",
+    "version": "120.0.6099.130",
+    "bookmarks": [
+      "国家法律法规数据库 - flk.npc.gov.cn",
+      "中国政府网 - gov.cn",
+      "国家互联网信息办公室 - cac.gov.cn",
+      "工业和信息化部 - miit.gov.cn",
+      "全国信息安全标准化技术委员会 - tc260.org.cn",
+      "北大法宝法律数据库 - pkulaw.com",
+      "威科先行法律信息库 - law.wkinfo.com.cn",
+      "中国裁判文书网 - wenshu.court.gov.cn",
+      "信安标委标准全文 - openstd.samr.gov.cn",
+      "个人信息保护合规审计指引 - cac.gov.cn/PIA",
+      "公司内部OA系统 - oa.intra.corp",
+      "公司合规数据库 - compliance.intra.corp",
+      "企业微信 - work.weixin.qq.com",
+      "腾讯文档 - docs.qq.com",
+      "钉钉网页版 - im.dingtalk.com",
+      "金山文档 - kdocs.cn",
+      "中国银行网银 - boc.cn"
+    ],
+    "extensions": [
+      "AdBlock - 广告拦截器",
+      "沙拉查词 - 聚合词典划词翻译",
+      "OneTab - 标签页管理",
+      "彩云小译 - 网页翻译",
+      "Markdown Viewer",
+      "Tampermonkey - 油猴脚本管理器"
+    ],
+    "history_summary": "法律法规检索及政务网站(38%), 公司内部OA与合规系统(27%), 办公协同与文档(20%), 行业资讯(9%), 其他(6%)"
+  },
+  "recent_files": [
+    "D:\\合规\\数据安全事件报告规范_V2.1.md",
+    "D:\\合规\\数据安全事件报告规范_V2.0.md",
+    "D:\\合规\\数据安全事件报告规范_V1.0.md",
+    "D:\\合规\\合规自查\\2026年Q2数据合规自查清单.xlsx",
+    "C:\\Users\\linhaifeng\\Documents\\数据安全事件应急预案_v3.docx",
+    "D:\\合规\\台账\\数据泄露事件登记台账.xlsx",
+    "C:\\Users\\linhaifeng\\Desktop\\合规确认函_模板.docx",
+    "D:\\合规\\法规库\\个人信息保护法.pdf",
+    "D:\\合规\\法规库\\数据安全法.pdf",
+    "C:\\Users\\linhaifeng\\Downloads\\网络数据安全管理条例.pdf"
+  ],
+  "desktop_shortcuts": [
+    "WPS Office",
+    "Microsoft Word",
+    "Microsoft Excel",
+    "Adobe Acrobat DC",
+    "福昕PDF阅读器",
+    "北大法宝",
+    "企业微信",
+    "微信",
+    "钉钉",
+    "腾讯会议",
+    "Google Chrome",
+    "Typora",
+    "VS Code",
+    "百度网盘",
+    "合规资料(D盘)",
+    "此电脑",
+    "回收站"
+  ],
+  "startup_programs": [
+    {
+      "name": "企业微信",
+      "path": "C:\\Program Files (x86)\\WXWork\\WXWork.exe",
+      "enabled": true
+    },
+    {
+      "name": "微信",
+      "path": "C:\\Program Files (x86)\\Tencent\\WeChat\\WeChat.exe",
+      "enabled": true
+    },
+    {
+      "name": "搜狗输入法",
+      "path": "C:\\Program Files (x86)\\SogouInput\\SogouCloud.exe",
+      "enabled": true
+    },
+    {
+      "name": "火绒安全",
+      "path": "C:\\Program Files\\Huorong\\Sysdiag\\bin\\HipsTray.exe",
+      "enabled": true
+    },
+    {
+      "name": "钉钉",
+      "path": "C:\\Program Files (x86)\\DingDing\\DingtalkLauncher.exe",
+      "enabled": false
+    },
+    {
+      "name": "百度网盘",
+      "path": "C:\\Users\\linhaifeng\\AppData\\Roaming\\BaiduYunGuanjia\\BaiduYunGuanjia.exe",
+      "enabled": true
+    },
+    {
+      "name": "NVIDIA GeForce Experience",
+      "path": "C:\\Program Files\\NVIDIA Corporation\\NVIDIA GeForce Experience\\NVIDIA GeForce Experience.exe",
+      "enabled": true
+    },
+    {
+      "name": "Realtek HD Audio Manager",
+      "path": "C:\\Program Files\\Realtek\\Audio\\HDA\\RtkNGUI64.exe",
+      "enabled": true
+    }
+  ],
+  "scheduled_tasks": [
+    {
+      "name": "合规资料增量备份",
+      "schedule": "每天 22:30",
+      "action": "将D盘合规资料增量备份到E盘归档",
+      "enabled": true
+    },
+    {
+      "name": "法规库更新检查",
+      "schedule": "每周一 09:00",
+      "action": "提醒检查国家法律法规数据库是否有新发布/修订",
+      "enabled": true
+    },
+    {
+      "name": "数据合规自查提醒",
+      "schedule": "每季度首月1日 08:30",
+      "action": "显示当季数据合规自查清单",
+      "enabled": true
+    },
+    {
+      "name": "系统安全扫描",
+      "schedule": "每周日 22:00",
+      "action": "运行火绒安全全盘扫描",
+      "enabled": true
+    },
+    {
+      "name": "Windows更新检查",
+      "schedule": "每周三 02:00",
+      "action": "检查并安装Windows系统更新",
+      "enabled": false
+    }
+  ],
+  "network": {
+    "hostname": "LIN-COMPLIANCE",
+    "ip_address": "10.20.3.118",
+    "dns": [
+      "10.20.0.1",
+      "114.114.114.114"
+    ],
+    "wifi_profiles": [
+      "Corp-Office-5G",
+      "Corp-Office-2.4G",
+      "Corp-Guest",
+      "LIN-Home-WiFi6",
+      "林海峰的iPhone"
+    ],
+    "proxy": {
+      "enabled": false,
+      "host": "",
+      "port": 0
+    }
+  },
+  "environment_variables": {
+    "USERPROFILE": "C:\\Users\\linhaifeng",
+    "APPDATA": "C:\\Users\\linhaifeng\\AppData\\Roaming",
+    "LOCALAPPDATA": "C:\\Users\\linhaifeng\\AppData\\Local",
+    "TEMP": "C:\\Users\\linhaifeng\\AppData\\Local\\Temp",
+    "TMP": "C:\\Users\\linhaifeng\\AppData\\Local\\Temp",
+    "PUBLIC": "C:\\Users\\Public",
+    "PROGRAMFILES": "C:\\Program Files",
+    "PROGRAMFILES(X86)": "C:\\Program Files (x86)",
+    "COMMONPROGRAMFILES": "C:\\Program Files\\Common Files",
+    "SYSTEMROOT": "C:\\Windows",
+    "PYTHON_HOME": "C:\\Program Files\\Python312"
+  },
+  "registry_notes": "已注册组件包括: 微软雅黑、思源黑体、阿里巴巴普惠体等中文字体; DirectX 12运行时; Visual C++ 2015-2022可再发行组件包; .NET Framework 4.8; 腾讯系软件COM组件(企业微信、微信协议支持); Adobe Acrobat PDF iFilter; 福昕PDF组件; WPS Office与Microsoft Office文档处理组件; 搜狗输入法输入法引擎; 火绒安全组件及驱动; Python 3.12解释器及pip环境",
+  "windows_features": [
+    "Windows Media Player",
+    "Internet Explorer 11",
+    ".NET Framework 3.5",
+    ".NET Framework 4.8 高级服务",
+    "Windows 照片查看器",
+    "打印和文档服务",
+    "远程桌面连接",
+    "Windows Defender防火墙",
+    "虚拟打印机 Microsoft Print to PDF",
+    "DirectX 12",
+    "Windows Hello 人脸识别",
+    "蓝牙支持"
+  ]
+}

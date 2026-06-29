@@ -1,5 +1,21 @@
 # 更新日志
 
+## v1.0.4 (2026-06-29)
+
+### 🐛 Bug 修复
+
+#### 修复工具调用证据采集(`tool_calls` 对服务端自主 agent 恒空)
+**问题**: 轨迹中每个 turn 的 `tool_calls` 恒为空,导致 evaluator 误判 agent「硬编码/造假」——如 02_task1:agent 真读了 CSV,却因无 tool_calls 记录被判「未调用工具、过程性造假」。
+
+**原因**: OC-SDK 只从 WebSocket 实时事件流(`stream=="tool"`)采集工具调用,而 OpenClaw 是服务端自主 agent,内部跑完工具、最后一次性返回 final message;收到 `chat state=="final"` 即 `break`,工具事件未在此前到达 → `ExecutionResult.tool_calls` 恒空。
+
+**修复**:
+- 工具证据改从 OC 服务端 `chat_history` 解析:`role==assistant` 的 `toolCall` 块与 `role==toolResult` 消息按 `id`↔`toolCallId` 配对(`trajectory.extract_tool_calls`)。
+- 每轮在 turn 循环中增量采集(`before/after` 历史 diff,按 timestamp 截取本轮新增),经 `process_turn(..., tool_calls=)` 传入 `build_turn_record`。
+- evaluator 兜底:空 `tool_calls` 与 `evidence_incomplete` 同等对待,MUST NOT 据以判造假;「声称与证据矛盾」须以可确证反证(磁盘真相/oracle 冲突)为据。
+
+**验证**: 重跑 02_task1,Turn1 正确采到 `read`/`write`;evaluator 转为基于真实磁盘产物给出准确判定(指出 HTML 排名逻辑错误),不再误判造假,outcome 由 max_turn 改善为 done。
+
 ## v1.0.3 (2026-03-06)
 
 ### 🐛 Bug 修复

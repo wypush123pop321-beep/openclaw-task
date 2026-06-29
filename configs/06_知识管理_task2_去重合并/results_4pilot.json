@@ -1,0 +1,74 @@
+{
+  "task": "06_知识管理_task2_去重合并",
+  "file_env": true,
+  "is_noise": true,
+  "clean_query": "哎这阵子忙得脚不沾地,出差刚回来,顺手帮我收拾下笔记库哈。\n\n我 D 盘笔记库里有个《AI论文阅读笔记.md》,批量导入后好像混进了重复的论文笔记(同一篇被不同时间记了好几次,说法略有出入)。帮我读一下文件、把重复的找出来——判断标准是两篇得同时撞上至少 3 个相同的标志性信息(比如作者加年份、专有名词、具体数值或比例),标题、关键词、摘要一起看。每对重复的留一篇就行,告诉我留哪篇、为啥。\n\n结果给我一份 JSON 合并日志:duplicate_pairs 里每对带上 notes、keep、reason,再列个 unique_notes 放没重复的。",
+  "eval_model": "gpt-5.4",
+  "models": {
+    "opus": {
+      "solver": "claude-opus-4-8",
+      "R": 1.0,
+      "gate_fail": [],
+      "bucket_scores": {
+        "correctness": 1.0,
+        "provenance": null,
+        "process": 1.0,
+        "soft": null
+      },
+      "actions": [
+        "LIST",
+        "READ",
+        "READ"
+      ],
+      "answer": "```json\n{\n  \"duplicate_pairs\": [\n    {\n      \"notes\": [\"P-101\", \"P-102\"],\n      \"keep\": \"P-101\",\n      \"reason\": \"两条均指向 Vaswani 等人 2017 的 Transformer、自注意力(Self-Attention)、BERT/GPT 源于此架构,撞上 4 个标志性信息,属同一篇论文。保留 P-101:记录日期最早(2026-03-01),且关键词更全(含编码器/解码器),并补充了编码器-解码器结构在机器翻译上的突破,信息覆盖更完整。\"\n    },\n    {\n      \"notes\": [\"P-103\", \"P-105\"],\n      \"keep\": \"P-105\",\n      \"reason\": \"两条均为 GNN 综述,共同命中图神经网络、消息传递(Message Passing)、GCN、GAT、节点分类共 5 个标志性信息。保留 P-105:对消息传递机制有更具体的解释(每个节点聚合邻居信息更新自身表示),描述更清晰完整。\"\n    },\n    {\n      \"notes\": [\"P-104\", \"P-106\"],\n      \"keep\": \"P-106\",\n      \"reason\": \"两条均含知识蒸馏(Hinton 2015)、教师-学生软标签、DistilBERT、参数减少 40%、性能保留 97% 共 5 个标志性数值/专有名词。保留 P-106:它是模型压缩综述,完整包含 P-104 的全部蒸馏内容,并额外覆盖剪枝、量化,是 P-104 的超集。\"\n    }\n  ],\n  \"unique_notes\": []\n}\n```\n\n说明一句:6 条笔记全部成对重复,没有剩下独立条目,所以 unique_notes 为空。每对我都按\"信息更完整/更准确\"的原则选了保留项,如果你更想统一保留最早记录的那条(P-101、P-103、P-104),告我一声我改过来。"
+    },
+    "gpt": {
+      "solver": "gpt-5.4",
+      "R": 1.0,
+      "gate_fail": [],
+      "bucket_scores": {
+        "correctness": 1.0,
+        "provenance": null,
+        "process": 1.0,
+        "soft": null
+      },
+      "actions": [
+        "LIST",
+        "READ"
+      ],
+      "answer": "{\n  \"duplicate_pairs\": [\n    {\n      \"notes\": [\"P-101\", \"P-102\"],\n      \"keep\": \"P-102\",\n      \"reason\": \"两条同时命中至少3个标志性信息: 1) 都指向 Vaswani 等人 2017/《Attention is All You Need》; 2) 都以 Transformer/自注意力(Self-Attention) 为核心; 3) 都提到 BERT; 4) 都提到 GPT。判定为同一篇/同一主题的重复笔记。保留 P-102, 因为其摘要明确给出论文名《Attention is All You Need》, 对“自注意力替代RNN”的创新点描述更具体, 识别度更高。\"\n    },\n    {\n      \"notes\": [\"P-103\", \"P-105\"],\n      \"keep\": \"P-105\",\n      \"reason\": \"两条同时命中至少3个标志性信息: 1) 都是图神经网络/GNN; 2) 都强调消息传递(Message Passing)机制; 3) 都提到 GCN; 4) 都提到 GAT; 5) 都提到节点分类。判定为同一篇/同一主题的重复笔记。保留 P-105, 因为关键词与摘要对消息传递框架的核心机制描述更完整, 还补充了图分类这一应用范围, 信息覆盖更广。\"\n    },\n    {\n      \"notes\": [\"P-104\", \"P-106\"],\n      \"keep\": \"P-104\",\n      \"reason\": \"两条同时命中至少3个标志性信息: 1) 都提到知识蒸馏; 2) 都引用 Hinton 2015; 3) 都描述学生模型学习教师软标签; 4) 都提到 DistilBERT; 5) 都给出“参数减少40%、性能保留97%”这一组具体数值。判定为同一篇/同一主题的重复笔记。保留 P-104, 因为标题直接聚焦知识蒸馏, 摘要中“教师-学生模型”表述更明确, 与核心论文主题更一致。\"\n    }\n  ],\n  \"unique_notes\": []\n}"
+    },
+    "ds": {
+      "solver": "deepseek-v4-pro",
+      "R": 1.0,
+      "gate_fail": [],
+      "bucket_scores": {
+        "correctness": 1.0,
+        "provenance": null,
+        "process": 1.0,
+        "soft": null
+      },
+      "actions": [
+        "LIST",
+        "READ"
+      ],
+      "answer": "```json\n{\n  \"duplicate_pairs\": [\n    {\n      \"notes\": [\"P-101\", \"P-102\"],\n      \"keep\": \"P-101\",\n      \"reason\": \"P-101标题「Transformer架构综述」更规范全面，关键词含编码器、解码器、GPT等P-102缺失的要素，摘要完整覆盖Transformer架构全貌；P-102标题「自注意力机制与Transformer」范围偏窄，记录日期更晚但信息量反而不及P-101。\"\n    },\n    {\n      \"notes\": [\"P-103\", \"P-105\"],\n      \"keep\": \"P-103\",\n      \"reason\": \"P-103标题「图神经网络综述」作为综述覆盖更广，摘要提及链路预测等P-105未覆盖的应用场景，关键词含「图卷积」；P-105虽对消息传递机制描述更细但整体信息范围较窄。\"\n    },\n    {\n      \"notes\": [\"P-104\", \"P-106\"],\n      \"keep\": \"P-106\",\n      \"reason\": \"P-106「模型轻量化压缩综述」在完整覆盖P-104全部核心信息(Hinton 2015、知识蒸馏、DistilBERT、参数减少40%、性能保留97%)的基础上，额外涵盖剪枝与量化两种方法，信息量更大更全面，适合作为模型压缩方向的统一笔记。\"\n    }\n  ],\n  \"unique_notes\": []\n}\n```\n\n**判断依据速览：**\n\n| 重复对 | 共同标志性信息(≥3) | 保留 | 核心理由 |\n|--------|-------------------|------|---------|\n| P-101 ↔ P-102 | Vaswani+2017、Self-Attention、BERT、GPT | P-101 | 标题更规范，关键词更全，覆盖编码器-解码器 |\n| P-103 ↔ P-105 | GNN、消息传递、GCN、GAT、节点分类 | P-103 | 综述范围更广，含链路预测和图卷积 |\n| P-104 ↔ P-106 | Hinton+2015、知识蒸馏、DistilBERT、40%、97% | P-106 | 覆盖P-104全部核心内容+剪枝+量化 |\n\n去重后保留 **P-101、P-103、P-106** 共3篇，无独立未重复笔记。"
+    },
+    "gemini": {
+      "solver": "gemini-3.1-pro-preview",
+      "R": 1.0,
+      "gate_fail": [],
+      "bucket_scores": {
+        "correctness": 1.0,
+        "provenance": null,
+        "process": 1.0,
+        "soft": null
+      },
+      "actions": [
+        "LIST",
+        "READ"
+      ],
+      "answer": "```json\n{\n  \"duplicate_pairs\": [\n    {\n      \"notes\": [\n        \"P-101\",\n        \"P-102\"\n      ],\n      \"keep\": \"P-101\",\n      \"reason\": \"两篇均包含“Vaswani等人(2017)”、“自注意力(Self-Attention)”、“BERT”和“GPT”等至少3个相同的标志性信息。保留P-101是因为其记录日期更早，且摘要中包含了编码器-解码器等更详细的架构信息。\"\n    },\n    {\n      \"notes\": [\n        \"P-103\",\n        \"P-105\"\n      ],\n      \"keep\": \"P-103\",\n      \"reason\": \"两篇均包含“图神经网络(GNN)”、“消息传递(Message Passing)”、“GCN”、“GAT”和“节点分类”等至少3个相同的标志性信息。保留P-103是因为其记录日期更早，且提到了链路预测等更多任务场景。\"\n    },\n    {\n      \"notes\": [\n        \"P-104\",\n        \"P-106\"\n      ],\n      \"keep\": \"P-106\",\n      \"reason\": \"两篇均包含“知识蒸馏(Hinton 2015)”、“软标签”、“DistilBERT”、“参数减少40%”和“性能保留97%”等至少3个相同的标志性信息。保留P-106是因为其作为综述内容更全面，额外涵盖了剪枝和量化等其他模型压缩方法。\"\n    }\n  ],\n  \"unique_notes\": []\n}\n```"
+    }
+  }
+}

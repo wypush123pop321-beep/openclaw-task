@@ -1,0 +1,120 @@
+[
+  {
+    "topic": "知识管理·论文笔记去重·合并日志输出",
+    "system_type": "windows",
+    "queries": [
+      "哎这阵子忙得脚不沾地,出差刚回来,顺手帮我收拾下笔记库哈。\n\n我 D 盘笔记库里有个《AI论文阅读笔记.md》,批量导入后好像混进了重复的论文笔记(同一篇被不同时间记了好几次,说法略有出入)。帮我读一下文件、把重复的找出来——判断标准是两篇得同时撞上至少 3 个相同的标志性信息(比如作者加年份、专有名词、具体数值或比例),标题、关键词、摘要一起看。每对重复的留一篇就行,告诉我留哪篇、为啥。\n\n结果给我一份 JSON 合并日志:duplicate_pairs 里每对带上 notes、keep、reason,再列个 unique_notes 放没重复的。"
+    ],
+    "skills": [],
+    "required_skills": [
+      []
+    ],
+    "required_files": [
+      [
+        "D:\\笔记库\\AI论文阅读笔记.md"
+      ]
+    ],
+    "rubrics": [
+      [
+        "[gate] 输出可解析为包含 duplicate_pairs 和 unique_notes 字段的 JSON",
+        "[gate] duplicate_pairs 数组非空",
+        "[final] duplicate_pairs 中包含 notes=[P-101, P-102] 的重复对(集合匹配)",
+        "[final] duplicate_pairs 中包含 notes=[P-103, P-105] 的重复对(集合匹配)",
+        "[final] duplicate_pairs 中包含 notes=[P-104, P-106] 的重复对(集合匹配)",
+        "[final] unique_notes 为空数组(所有笔记均有重复对)",
+        "[per_turn] 每个 duplicate_pair 条目包含 notes、keep、reason 三个字段"
+      ]
+    ],
+    "evaluate": [
+      {
+        "evaluator_agent": "evaluator",
+        "evaluate_every_n_turns": 2,
+        "feedback_to_user": true,
+        "oracle_ref": "oracle.json",
+        "custom_rubrics": [
+          {
+            "id": "G1",
+            "when": "gate",
+            "evaluator": "program",
+            "gt_ref": null,
+            "text": "答案可解析,给出重复对(duplicate_pairs)与唯一项(unique_notes)两部分内容(格式不限,可识别)",
+            "formula": "parseable(out) ∧ 答案含 重复对 与 唯一项 两部分 (format-agnostic)"
+          },
+          {
+            "id": "G2",
+            "when": "gate",
+            "evaluator": "program",
+            "gt_ref": "derived.total_pairs",
+            "text": "duplicate_pairs 数组非空",
+            "formula": "len(out.duplicate_pairs) >= 1"
+          },
+          {
+            "id": "C1",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.pair_id_to_notes.Pair-A",
+            "text": "duplicate_pairs 中包含 notes=[P-101,P-102] 的重复对(集合匹配,忽略顺序)",
+            "formula": "∃ p ∈ out.duplicate_pairs: set(p.notes) == set(oracle.derived.pair_id_to_notes['Pair-A'])"
+          },
+          {
+            "id": "C2",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.pair_id_to_notes.Pair-B",
+            "text": "duplicate_pairs 中包含 notes=[P-103,P-105] 的重复对(集合匹配,忽略顺序)",
+            "formula": "∃ p ∈ out.duplicate_pairs: set(p.notes) == set(oracle.derived.pair_id_to_notes['Pair-B'])"
+          },
+          {
+            "id": "C3",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.pair_id_to_notes.Pair-C",
+            "text": "duplicate_pairs 中包含 notes=[P-104,P-106] 的重复对(集合匹配,忽略顺序)",
+            "formula": "∃ p ∈ out.duplicate_pairs: set(p.notes) == set(oracle.derived.pair_id_to_notes['Pair-C'])"
+          },
+          {
+            "id": "C4",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.unique_notes",
+            "text": "unique_notes 为空(所有笔记均有重复对,无独立条目)",
+            "formula": "out.unique_notes == [] ∨ len(out.unique_notes) == 0"
+          },
+          {
+            "id": "PT1",
+            "when": "per_turn",
+            "evaluator": "program",
+            "gt_ref": null,
+            "text": "每个 duplicate_pair 条目包含 notes、keep、reason 三个字段",
+            "formula": "∀ p ∈ out.duplicate_pairs: 'notes' ∈ p ∧ 'keep' ∈ p ∧ 'reason' ∈ p"
+          }
+        ],
+        "scoring": {
+          "gate_zero": true,
+          "weights": {
+            "correctness": 0.7,
+            "provenance": 0.0,
+            "process": 0.2,
+            "soft": 0.1
+          },
+          "bucket_map": {
+            "correctness": [
+              "C1",
+              "C2",
+              "C3",
+              "C4"
+            ],
+            "provenance": [],
+            "process": [
+              "PT1"
+            ],
+            "soft": []
+          },
+          "aggregation": "若任一 gate=False → R=0。否则 R = Σ_bucket w_bucket·(桶内通过/桶内总) / Σ w_有效桶。provenance/soft 桶均空→有效桶=correctness(0.70)+process(0.20)=0.90,自归一化后全过R=1.00。机器判分占比100%→诚信→进RL。",
+          "note": "C1~C3 为集合匹配(忽略 pair 内两个 id 的顺序及 keep 的选择);C4 查 unique_notes 为空;PT1 查字段完整性。噪声前缀测试 agent 从口语干扰中提取任务意图的鲁棒性。"
+        }
+      }
+    ],
+    "is_noise": true
+  }
+]

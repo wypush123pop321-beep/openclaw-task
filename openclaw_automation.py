@@ -23,7 +23,13 @@ from openclaw_sdk import OpenClawClient, AgentConfig, ExecutionOptions
 from openclaw_sdk.core.types import ExecutionResult
 from openclaw_sdk.core.exceptions import GatewayError
 
-from trajectory import Trajectory, build_turn_record, capture_file_evidence
+from trajectory import (
+    Trajectory,
+    ToolCallEvidence,
+    build_turn_record,
+    capture_file_evidence,
+    extract_tool_calls,
+)
 from evaluator import Evaluator, EvaluateConfig, Rubric
 
 from utils.connection import (
@@ -570,6 +576,34 @@ def _restore_eval_files(evaluate: Optional[EvaluateConfig]) -> None:
             logger.warning("[文件隔离] 还原失败(忽略): %s (%s)", path, e)
 
 
+def _new_messages_since(
+    before: List[dict[str, Any]], after: List[dict[str, Any]]
+) -> List[dict[str, Any]]:
+    """从 after 取出相对 before 新增的消息(按 timestamp 界,稳健于 limit 截断)。"""
+    if not after:
+        return []
+    if not before:
+        return list(after)
+    before_max_ts = max(
+        (m.get("timestamp", 0) for m in before if isinstance(m, dict)), default=0
+    )
+    return [
+        m for m in after
+        if isinstance(m, dict) and m.get("timestamp", 0) > before_max_ts
+    ]
+
+
+async def _safe_chat_history(agent) -> List[dict[str, Any]]:
+    """安全拉取被测 agent 会话历史(失败降级为空,绝不中断主流程)。"""
+    try:
+        return await agent._client.gateway.chat_history(
+            agent.session_key, limit=EXECUTION_HISTORY_FALLBACK_LIMIT
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.debug("chat_history 采集失败: %s", e)
+        return []
+
+
 async def process_turn(
     client: OpenClawClient,
     query: QueryItem,
@@ -579,6 +613,8 @@ async def process_turn(
     evidence_incomplete: bool,
     trajectory: Trajectory,
     evaluator: Optional[Evaluator],
+    agent: Any = None,
+    before_history: Optional[List[dict[str, Any]]] = None,
 ) -> Optional[str]:
     """逐轮处理(仅多轮 simulator 路径):能力1 每轮捕获带证据轨迹 + 能力2 按 eval_step 节流评估。
 
@@ -592,9 +628,25 @@ async def process_turn(
     if evaluator is None:
         return None
 
-    # 能力1:逐轮捕获带证据的轨迹(tool_calls 内存直取,免费;文件证据升级为磁盘真相 D5)
+    # 能力1:从 OC chat_history 解析本轮新增工具调用(SDK 的 ExecutionResult.tool_calls
+    # 对服务端自主 agent 恒空),再逐轮捕获带证据的轨迹(文件证据升级为磁盘真相 D5)。
     # 即便本轮不评审也要捕获,否则评审点窗口取不到中间轮数据。
-    turn_record = build_turn_record(turn, current_query, result, evidence_incomplete)
+    # before_history 须由调用方在 execute 之前采集(本轮基线),after 在此处取以截取增量。
+    turn_tool_calls: Optional[List[ToolCallEvidence]] = None
+    if agent is not None:
+        try:
+            after_history = await _safe_chat_history(agent)
+            new_msgs = _new_messages_since(before_history or [], after_history)
+            turn_tool_calls = extract_tool_calls(new_msgs)
+            # 兜底但从 history 救回了工具证据 → 不再算"证据不完整"
+            if evidence_incomplete and turn_tool_calls:
+                evidence_incomplete = False
+        except Exception as e:  # noqa: BLE001
+            logger.debug("解析本轮 tool_calls 失败,降级为空: %s", e)
+
+    turn_record = build_turn_record(
+        turn, current_query, result, evidence_incomplete, tool_calls=turn_tool_calls
+    )
     try:
         await capture_file_evidence(client.gateway, query.agent_name, turn_record)
     except Exception as e:  # noqa: BLE001
@@ -915,6 +967,9 @@ async def execute_queries(
             logger.debug("[Q%d] %s", turn, current_query)
             agent = client.get_agent(query.agent_name, session_name)
 
+            # 能力1:采集本轮工具证据基线(发送前的会话历史),供本轮结束后做增量解析
+            before_history = await _safe_chat_history(agent)
+
             try:
                 result, evidence_incomplete = await execute_with_retry(
                     agent, current_query, options
@@ -946,10 +1001,11 @@ async def execute_queries(
                 success = True
                 break
 
-            # 能力1+能力2:逐轮捕获带证据轨迹 + 按 eval_step 节流的第三方评估,反馈喂回 simulator
+            # 能力1+能力2:逐轮捕获带证据轨迹(含从 chat_history 解析的 tool_calls)
+            # + 按 eval_step 节流的第三方评估,反馈喂回 simulator
             evaluator_feedback = await process_turn(
                 client, query, turn, current_query, result, evidence_incomplete,
-                trajectory, evaluator,
+                trajectory, evaluator, agent=agent, before_history=before_history,
             )
 
             user_reply = query_simulator.chat(agent_reply, evaluator_feedback=evaluator_feedback)
