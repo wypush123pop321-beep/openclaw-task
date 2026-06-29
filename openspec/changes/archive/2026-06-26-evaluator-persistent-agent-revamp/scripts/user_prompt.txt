@@ -90,6 +90,7 @@ config 里 evaluator agent 的 system_prompt， 现在是不生效吗？ 现在�
 2. configs/config_session.json中，"simulator_config": "configs/user_proxy_model.json",  为何新增这个字段？
 3. openclaw_automation.py中为何要删除copy_path方法？
 4. process_turn ---更名---> evaluator_process_turn
+5. Evaluator的prompt中要显式添加：禁止创建新的文件的要求。
 
 核心改动总览：
 1. user_simulator.chat 增加 evaluator_feedback入参。
@@ -106,3 +107,12 @@ config 里 evaluator agent 的 system_prompt， 现在是不生效吗？ 现在�
 3. Trajectory.py:
 3.1. 对编排层暴露Trajectory, build_turn_record, capture_file_evidence三个方法。capture_file_evidence是通过SDK/OS两层校验来判定文件确实存在。
 3.1. 为什么需要Trajectory? Trajectory记录了历史的所有轨迹信息 （原先难道没有轨迹信息吗？没有的，历史信息存在agent侧），同时负责收集ToolCallEvidence + FileEvidence, 负责eval_step逻辑抽象。
+
+
+0627检视意见：
+1. 去除openspec-避免提交到主仓
+2. await StructuredOutput.execute ---> 不稳定， 要有重连重试机制。 尽量去复用： execute_with_retry
+3. Evaluator提示词组装逻辑重构， 用file + replace的形式, 不要写死在代码里避免太混乱了。
+4. 修改system_prompt,  如果没有参考第三方评估反馈（Evaluator Feedback）， 那么不做参考。
+5. 用光钰的2个复杂任务本地试一下， 联动沙箱做远程测试，跑完之后评估一下结果。
+

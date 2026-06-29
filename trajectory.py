@@ -56,7 +56,6 @@ class FileEvidence(BaseModel):
     error: Optional[str] = None  # 取证失败原因(如路径不可达)→ 降级,不当负面证据
     discovered: bool = False  # True=经工作区清点主动发现(非 agent 自报)
 
-
 class TurnRecord(BaseModel):
     """单个 turn 的执行记录。"""
     turn: int
@@ -69,11 +68,22 @@ class TurnRecord(BaseModel):
 
 
 class Trajectory(BaseModel):
-    """一个 query 的完整运行记录。"""
+    """一个 query 的完整运行记录(可落盘为 RL 样本:轨迹 + 各评审点评分)。"""
     query: str
     agent_name: str
     turns: list[TurnRecord] = Field(default_factory=list)
     outcome: Optional[str] = None  # "done" | "failed" | "max_turn"
+    # 各评审点的评分结果(逐条 0/1、gate 状态、分桶得分、completion(0~1)、所在 turn);终局评审点的 completion 即最终成绩
+    evaluations: list[dict] = Field(default_factory=list)
+
+    def save(self, path: Any) -> None:
+        """把完整轨迹(含 turns/tool_calls/产物指针/outcome/evaluations)序列化落盘为 JSON。
+
+        跑完即留,供离线查阅与 RL 训练样本使用(能力: trajectory-persistence)。
+        """
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(self.model_dump_json(indent=2), encoding="utf-8")
 
     def render_full(self, exclude_last: bool = False) -> str:
         """渲染历轮全文,供 evaluator 审阅(D4: 全文,不压缩摘要)。"""

@@ -40,17 +40,9 @@ class User_simulator:
         """
         self._template = Path(prompt_file).read_text(encoding="utf-8")
 
-        # 尝试从 user_directory 对应的目录下读取 user_profile.json
-        # user_directory 可能是真实路径，也可能是文件树文本，用 try/except 兼容
+        # 用户画像由装配层(openclaw_automation.create_simulator)按 user_dir.profile_file 读好后传入;
+        # simulator 只认传入值,不再自读固定文件名 user_profile.json(消除双读/覆盖与文件名写死)。
         self._user_profile = user_profile
-        if user_directory:
-            try:
-                profile_path = Path(user_directory) / "user_profile.json"
-                if profile_path.exists():
-                    profile_data = json.loads(profile_path.read_text(encoding="utf-8"))
-                    self._user_profile = json.dumps(profile_data, ensure_ascii=False, indent=2)
-            except OSError:
-                pass  # user_directory 是文本描述而非真实路径，忽略
         self._user_directory = user_directory
         self._current_origin_query = origin_query
         self.model = model

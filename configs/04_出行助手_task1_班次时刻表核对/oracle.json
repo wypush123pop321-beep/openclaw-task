@@ -1,0 +1,81 @@
+{
+  "task_id": "出行_班次时刻表核对",
+  "as_of": "2026-06-27",
+  "mode": "real_file_env",
+  "note": "全部从真实 CSV(6 行车次)按出行约束精算；约束：出发>=14:00 且 到达<=16:00（会议16:30+30分钟缓冲→16:00前到；上午有事→14:00后出发）。",
+  "constraints": {
+    "travel_date": "2026-03-20",
+    "weekday": "周五",
+    "meeting_start": "16:30",
+    "buffer_minutes": 30,
+    "arrive_by": "16:00",
+    "depart_after": "14:00",
+    "rule": "depart >= 14:00 AND arrive <= 16:00"
+  },
+  "derived": {
+    "eligible_trains": [
+      "G7305",
+      "G7309"
+    ],
+    "eligible_detail": [
+      {
+        "train": "G7305",
+        "depart": "14:23",
+        "arrive": "15:24",
+        "price_2nd": 79
+      },
+      {
+        "train": "G7309",
+        "depart": "14:58",
+        "arrive": "15:59",
+        "price_2nd": 79
+      }
+    ],
+    "eligible_count": 2,
+    "latest_eligible": "G7309",
+    "latest_depart": "14:58",
+    "latest_arrive": "15:59",
+    "excluded_trains": {
+      "G7301": {
+        "train": "G7301",
+        "depart": "13:48",
+        "arrive": "14:49",
+        "fail_depart_floor": true,
+        "fail_arrive_ceil": false,
+        "reason": "出发 13:48 早于 14:00 下限（上午有事，14:00 后才能出发）"
+      },
+      "G7313": {
+        "train": "G7313",
+        "depart": "15:33",
+        "arrive": "16:34",
+        "fail_depart_floor": false,
+        "fail_arrive_ceil": true,
+        "reason": "到达 16:34 晚于 16:00 上限（会议16:30，需留30分钟缓冲，最晚16:00前到）"
+      },
+      "G7317": {
+        "train": "G7317",
+        "depart": "16:08",
+        "arrive": "17:09",
+        "fail_depart_floor": false,
+        "fail_arrive_ceil": true,
+        "reason": "到达 17:09 晚于 16:00 上限（会议16:30，需留30分钟缓冲，最晚16:00前到）"
+      },
+      "G7321": {
+        "train": "G7321",
+        "depart": "16:43",
+        "arrive": "17:44",
+        "fail_depart_floor": false,
+        "fail_arrive_ceil": true,
+        "reason": "到达 17:44 晚于 16:00 上限（会议16:30，需留30分钟缓冲，最晚16:00前到）"
+      }
+    },
+    "price_2nd_class": 79
+  },
+  "provenance": [
+    {
+      "source": "D/出行/杭州东-上海虹桥车次.csv",
+      "as_of": "2026-06-27",
+      "real_file": true
+    }
+  ]
+}

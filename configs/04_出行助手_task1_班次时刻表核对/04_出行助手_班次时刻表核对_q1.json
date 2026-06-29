@@ -1,0 +1,65 @@
+{
+  "_comment": "AutomationConfig(generate_configs.py 口径)。task1_班次时刻表核对：时刻表已落为真实用户文件 D/出行/杭州东-上海虹桥车次.csv，MAP_Windows.json 为文件系统映射，env_config.json 为机器快照。agent 需读真实 CSV 并按约束(出发>=14:00 且 到达<=16:00)过滤。本 task 为干净基线(无 noise)。",
+  "system": {
+    "platform": [
+      "windows"
+    ],
+    "python": "3.12",
+    "tools": []
+  },
+  "input_dir": {
+    "skill_dir": "skill_localize/skills_library",
+    "agent_dir": "agents",
+    "user_dir": {
+      "path": "configs/04_出行助手_task1_班次时刻表核对",
+      "profile_file": "user_profile_1_商务出行者_HZS.json",
+      "map_file": "MAP_Windows"
+    }
+  },
+  "agents": [
+    {
+      "name": "assistant1",
+      "role": "solver",
+      "config": [],
+      "skills": [],
+      "model": "deepseek-v4-pro"
+    },
+    {
+      "name": "evaluator",
+      "config": [],
+      "skills": [],
+      "model": "gemini-3-flash-preview",
+      "model_provider": "custom-yibuapi-com"
+    }
+  ],
+  "_note_evaluator": "evaluator 不在这里定义：它已由轨迹生产管线提供。我们只在 queries[].evaluate 里按名字引用并传入 custom_rubrics。",
+  "queries": [
+    {
+      "agent_name": "assistant1",
+      "text": "我2026-03-20周五要从杭州东坐高铁去上海虹桥开会，会议16:30开始，我想留够30分钟、最晚16:00前到，上午有事得14:00以后才能走。当天车次我存在D盘出行目录的表里了，帮我看哪几班赶得上、最晚能坐哪班，其他班为啥不行也说下。",
+      "is_noise": false,
+      "session_name": "query1",
+      "timeout": 3600,
+      "evaluate": {
+        "evaluator_agent": "evaluator",
+        "evaluate_every_n_turns": 1,
+        "feedback_to_user": true,
+        "oracle_ref": "oracle.json",
+        "rubrics_ref": "user_queries.json#/0/evaluate/0/custom_rubrics",
+        "scoring": {
+          "gate_zero": true,
+          "weights": {
+            "correctness": 0.55,
+            "provenance": 0.0,
+            "process": 0.15,
+            "soft": 0.1
+          }
+        }
+      }
+    }
+  ],
+  "gateway_ws_url": "ws://127.0.0.1:18789/gateway",
+  "api_key": null,
+  "workspace_base": "~/.openclaw/workspace",
+  "simulator_config": "configs/user_proxy_model.json"
+}

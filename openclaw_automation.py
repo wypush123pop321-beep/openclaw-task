@@ -24,7 +24,7 @@ from openclaw_sdk.core.types import ExecutionResult
 from openclaw_sdk.core.exceptions import GatewayError
 
 from trajectory import Trajectory, build_turn_record, capture_file_evidence
-from evaluator import Evaluator, EvaluateConfig
+from evaluator import Evaluator, EvaluateConfig, Rubric
 
 from utils.connection import (
     build_openclaw_client,
@@ -158,6 +158,7 @@ class QueryItem(BaseModel):
     session_name: Optional[str] = Field("main", description="会话名称")
     timeout: Optional[int] = Field(3600, description="超时时间(秒)")
     use_simulator: bool = Field(True, description="是否启用 user-simulator 进行多轮对话,默认 True")
+    is_noise: bool = Field(False, description="噪声/干扰 query:agent 仍执行一次,但 evaluator 与 user_simulator 均不参与(不评估、不回复、不进多轮)")
     evaluate: Optional[EvaluateConfig] = Field(None, description="第三方 evaluator 配置(query 内联块);为空则本 query 不评估。rubric/eval_step 等迁入此块")
 
 
@@ -575,16 +576,27 @@ async def process_turn(
         return None
 
     window = step  # 最近 X 轮 = eval_step,窗口正好覆盖两次评审之间的全部 turn
+    rubric_items = evaluator.config.rubric_items()  # 结构化 rubric(旧式字符串自动归一)
     try:
         ev = await evaluator.evaluate_turn(
-            trajectory, turn_record, rubric=evaluator.config.rubrics, window=window
+            trajectory, turn_record, rubric=rubric_items, window=window
         )
     except Exception as e:  # noqa: BLE001
         logger.warning("evaluator 调用异常: %s", e)
         ev = None
 
-    if ev is not None and evaluator.feedback_to_simulator:
-        return evaluator.format_feedback(ev)
+    if ev is not None:
+        # 能力3:评分累积进轨迹(供落盘);终局评审点的 completion(0~1) 为该 query 最终成绩
+        trajectory.evaluations.append({
+            "turn": turn,
+            "completion": ev.completion,
+            "gate_status": ev.gate_status,
+            "bucket_scores": ev.bucket_scores,
+            "inclination": ev.inclination,
+            "rubric_checks": [rc.model_dump() for rc in ev.rubric_checks],
+        })
+        if evaluator.feedback_to_simulator:
+            return evaluator.format_feedback(ev)
     return None
 
 
@@ -826,10 +838,15 @@ async def execute_queries(
 
         await check_readyz()
 
+        # 噪声 query:agent 仍执行一次,但 evaluator 与 user_simulator 均不参与
+        # (不评估、不回复、不进多轮,亦不污染 simulator 记忆)。
+        if query.is_noise:
+            logger.info("query[%s] 标记为 is_noise:跳过 evaluator 与 user_simulator(仅执行 agent 一次)", base_session)
+
         # 按逻辑 session_name(裸名,不含 _RUN_ID)取/建 simulator 实例:
         # 首见即建、再见复用 → 同会话续聊保留记忆,跨会话隔离不泄露。
         query_simulator: Optional[User_simulator] = None
-        if query.use_simulator and simulator_factory is not None:
+        if query.use_simulator and not query.is_noise and simulator_factory is not None:
             query_simulator = simulators.get(base_session)
             if query_simulator is None:
                 query_simulator = simulator_factory()
@@ -849,9 +866,13 @@ async def execute_queries(
         # 能力2:per-query 构建持久 evaluator(无 evaluate 块则为 None);rubric/eval_step 取自该块。
         # evaluator agent 若在 agents 中配了 system_prompt,则用它作评估提示词模板(替代内置默认)。
         eval_sys_prompt = None
-        if query.evaluate is not None:
+        if query.evaluate is not None and not query.is_noise:
             eval_sys_prompt = (agent_system_prompts or {}).get(query.evaluate.agent_name)
-        evaluator = create_evaluator(query.evaluate, client, _RUN_ID, base_session, eval_sys_prompt)
+        # is_noise 时强制不建 evaluator(噪声 query 不评估)
+        evaluator = (
+            None if query.is_noise
+            else create_evaluator(query.evaluate, client, _RUN_ID, base_session, eval_sys_prompt)
+        )
 
         for turn in range(1, max_turn + 1 if query_simulator else 2):
             logger.debug("[Q%d] %s", turn, current_query)
@@ -927,6 +948,16 @@ async def execute_queries(
 
         results[f"result_{query.agent_name}"] = last_result
 
+        # 能力3:轨迹 + 评分落盘(RL 样本)。evaluator 启用时才采集了轨迹,故仅此时落盘。
+        if evaluator is not None and trajectory.turns:
+            try:
+                out_path = Path("logs") / "trajectories" / _RUN_ID / f"{base_session}.json"
+                trajectory.save(out_path)
+                logger.info("轨迹已落盘: %s (turns=%d, evals=%d, outcome=%s)",
+                            out_path, len(trajectory.turns), len(trajectory.evaluations), trajectory.outcome)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("轨迹落盘失败: %s", e)
+
         if not success:
             logger.error("任务 %d 失败,终止后续 %d 个任务", idx, len(queries) - idx)
             break
@@ -996,22 +1027,20 @@ class OpenClawAutomation:
             user_path = Path(user_dir_config.path).expanduser()
             content_root = user_path / user_path.name
 
-            if not content_root.exists() or not content_root.is_dir():
-                # env文件夹不存在时,copy_map_not_workspace必须不存在
-                assert not user_dir_config.map_file, (
-                    "input_dir.user_dir.map_file must be omitted when "
-                    "user_path / user_path.name does not exist"
-                )
-            elif user_dir_config.map_file:
-                # env文件夹存在,copy_map_not_workspace是True时,map_file必须存在。
+            if user_dir_config.map_file:
+                # map 模式(copy_map_not_workspace=True):按 map 逐条复制到真实路径。
+                # map 的 key 直接相对 user_dir.path 解析,不再强制走同名子文件夹;
+                # 为兼容旧布局,若同名子文件夹存在则仍以它作数据根。
+                data_dir = str(content_root) if content_root.is_dir() else str(user_path)
                 map_path = self._resolve_map_file(user_dir_config.path, user_dir_config.map_file)
-                # 数据子目录 = user_dir.path / user_dir_name(同名子文件夹)
-                data_dir = str(content_root)
                 self.workspace_manager.setup_from_map(map_path, base_dir=data_dir)
-            else:
-                # env文件夹存在时,copy_map_not_workspace必须显式设置成True或False
+            elif content_root.is_dir():
+                # 整体复制模式(copy_map_not_workspace=False):同名子文件夹为数据根,
+                # 顶层留给 MAP/profile 等元数据,bulk 复制时不会混入。
                 user_dir_path = user_dir_config.path
-                    # copy_map_not_workspace是False时,不会按照map_file的指导复制,此时如果存在map_file,需要给出wraning
+            else:
+                # 无 map_file 且无同名子文件夹:无用户文件树可部署,跳过。
+                logger.warning("user_dir 无 map_file 且同名子文件夹不存在,跳过用户目录部署: %s", content_root)
 
         for agent_config in self.config.agents:
             self.workspace_manager.setup_agent_files(
@@ -1069,6 +1098,65 @@ class OpenClawAutomation:
 # 配置加载器
 # ============================================================================
 
+def _resolve_json_pointer(data: Any, pointer: str) -> Any:
+    """按 RFC6901 JSON-Pointer 解引用(形如 /0/evaluate/0/custom_rubrics)。数字段转列表下标。"""
+    cur = data
+    for seg in pointer.split("/"):
+        if seg == "":
+            continue
+        seg = seg.replace("~1", "/").replace("~0", "~")  # RFC6901 转义
+        if isinstance(cur, list):
+            cur = cur[int(seg)]
+        else:
+            cur = cur[seg]
+    return cur
+
+
+def _resolve_evaluate_refs(config: "AutomationConfig", config_dir: Path) -> None:
+    """解引用各 query 的 evaluate 块外部引用,以 config 文件所在目录为相对基准。
+
+    - oracle_ref:加载 ground-truth → ev.oracle_data。
+    - rubrics_ref:JSON-Pointer 解引用 → ev.structured_rubrics;并按"权威源优先"合成 scoring。
+    路径缺失显式报错(不静默退空)。最后 resolve_runtime() 合成 scoring_spec。
+    """
+    for q in config.queries:
+        ev = q.evaluate
+        if ev is None:
+            continue
+
+        if ev.oracle_ref:
+            op = (config_dir / ev.oracle_ref)
+            if not op.exists():
+                raise FileNotFoundError(f"evaluate.oracle_ref 不存在: {op}")
+            ev.oracle_data = json.loads(op.read_text(encoding="utf-8"))
+
+        if ev.rubrics_ref:
+            file_part, _, ptr = ev.rubrics_ref.partition("#")
+            rp = (config_dir / file_part)
+            if not rp.exists():
+                raise FileNotFoundError(f"evaluate.rubrics_ref 不存在: {rp}")
+            raw = json.loads(rp.read_text(encoding="utf-8"))
+            arr = _resolve_json_pointer(raw, ptr) if ptr else raw
+            ev.structured_rubrics = [Rubric.from_raw(r, i) for i, r in enumerate(arr, 1)]
+
+            # scoring 合成优先级(design):rubrics_ref 指向的 evaluate 块为权威源(含完整 bucket_map),
+            # q1.json 内联 scoring 作覆盖/兜底。仅当内联缺 bucket_map 时才去权威源补。
+            if ev.scoring is None or "bucket_map" not in ev.scoring:
+                parent_ptr = ptr.rsplit("/", 1)[0] if "/" in ptr else ""
+                try:
+                    parent = _resolve_json_pointer(raw, parent_ptr) if parent_ptr else raw
+                    ref_scoring = parent.get("scoring") if isinstance(parent, dict) else None
+                except (KeyError, IndexError, ValueError):
+                    ref_scoring = None
+                if ref_scoring:
+                    merged = dict(ref_scoring)
+                    if ev.scoring:
+                        merged.update(ev.scoring)  # 内联作覆盖
+                    ev.scoring = merged
+
+        ev.resolve_runtime()  # 合成 scoring_spec
+
+
 class ConfigLoader:
     """配置文件加载器"""
 
@@ -1098,7 +1186,10 @@ class ConfigLoader:
             # 默认尝试 JSON
             data = json.loads(content)
 
-        return AutomationConfig(**data)
+        config = AutomationConfig(**data)
+        # evaluate 块外部引用解引用:以 config 文件所在目录为相对基准
+        _resolve_evaluate_refs(config, path.parent)
+        return config
 
     @staticmethod
     def load_from_dict(data: Dict[str, Any]) -> AutomationConfig:

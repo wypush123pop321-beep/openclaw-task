@@ -1,0 +1,130 @@
+[
+  {
+    "topic": "出行规划·班次时刻表核对·约束过滤",
+    "system_type": "windows",
+    "queries": [
+      "我2026-03-20周五要从杭州东坐高铁去上海虹桥开会，会议16:30开始，我想留够30分钟、最晚16:00前到，上午有事得14:00以后才能走。当天车次我存在D盘出行目录的表里了，帮我看哪几班赶得上、最晚能坐哪班，其他班为啥不行也说下。"
+    ],
+    "skills": [],
+    "required_skills": [
+      []
+    ],
+    "required_files": [
+      [
+        "D:\\出行\\杭州东-上海虹桥车次.csv"
+      ]
+    ],
+    "rubrics": [
+      [
+        "[gate] 输出可解析，包含可行车次列表和最晚车次结论",
+        "[gate] 正确应用约束（出发≥14:00 且到达≤16:00），未违反任一约束",
+        "[per_turn] 对时刻表逐行核验，正确识别每班车是否满足条件",
+        "[per_turn] 给出了被排除车次的排除原因",
+        "[final] 可行车次集合恰好为 {G7305, G7309}（共2班）",
+        "[final] 最晚可乘车次为 G7309（出发 14:58，到达 15:59）",
+        "[final] 正确排除 G7301（出发 13:48 早于 14:00 下限）",
+        "[final] 正确排除 G7313/G7317/G7321（到达时间均晚于 16:00）"
+      ]
+    ],
+    "evaluate": [
+      {
+        "evaluator_agent": "evaluator",
+        "evaluate_every_n_turns": 2,
+        "feedback_to_user": true,
+        "oracle_ref": "oracle.json",
+        "custom_rubrics": [
+          {
+            "id": "G1",
+            "when": "gate",
+            "evaluator": "program",
+            "gt_ref": null,
+            "text": "输出可解析，包含可行车次列表和最晚车次结论",
+            "formula": "parseable(out) ∧ has_eligible_list(out) ∧ has_latest_train(out)"
+          },
+          {
+            "id": "G2",
+            "when": "gate",
+            "evaluator": "program",
+            "gt_ref": "constraints",
+            "text": "约束应用正确：出发≥14:00 且 到达≤16:00，未在输出中违反任一约束条件",
+            "formula": "∀ t ∈ out.eligible_trains: t.depart >= '14:00' ∧ t.arrive <= '16:00'"
+          },
+          {
+            "id": "PT1",
+            "when": "per_turn",
+            "evaluator": "program",
+            "gt_ref": "embedded_timetable",
+            "text": "对时刻表逐行核验，分析了每班车是否满足约束（体现在回答中有逐条判断或说明）",
+            "formula": "out 对每班车均给出了满足/不满足的判断或合理省略说明"
+          },
+          {
+            "id": "PT2",
+            "when": "per_turn",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.excluded_trains",
+            "text": "给出被排除车次的排除原因（至少说明 G7301 和 G7313 其中之一的原因）",
+            "formula": "∃ t ∈ {G7301, G7313}: out 包含 t 的排除原因"
+          },
+          {
+            "id": "C1",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.eligible_trains",
+            "text": "可行车次集合恰好为 {G7305, G7309}（共2班，不多不少）",
+            "formula": "set(out.eligible) == {'G7305','G7309'}"
+          },
+          {
+            "id": "C2",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.latest_eligible",
+            "text": "最晚可乘车次为 G7309（出发 14:58，到达 15:59）",
+            "formula": "out.latest_train == 'G7309' ∧ out.latest_depart == '14:58' ∧ out.latest_arrive == '15:59'"
+          },
+          {
+            "id": "C3",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.excluded_trains.G7301",
+            "text": "正确排除 G7301（出发 13:48 早于 14:00 下限）",
+            "formula": "out 指出 G7301 因出发时间 13:48 < 14:00 而被排除"
+          },
+          {
+            "id": "C4",
+            "when": "final",
+            "evaluator": "oracle_cmp",
+            "gt_ref": "derived.excluded_trains",
+            "text": "正确排除 G7313（到达 16:34 > 16:00）；G7317/G7321 同理（允许合并表述'到达超时'）",
+            "formula": "out 指出 G7313 因到达 16:34 > 16:00 而被排除（允许合并G7317/G7321同类说明）"
+          }
+        ],
+        "scoring": {
+          "gate_zero": true,
+          "weights": {
+            "correctness": 0.55,
+            "provenance": 0.0,
+            "process": 0.15,
+            "soft": 0.1
+          },
+          "bucket_map": {
+            "correctness": [
+              "C1",
+              "C2",
+              "C3",
+              "C4"
+            ],
+            "provenance": [],
+            "process": [
+              "PT1",
+              "PT2"
+            ],
+            "soft": []
+          },
+          "aggregation": "若任一 gate=False → R=0；否则 R = Σ_bucket w_bucket·(该桶通过/该桶总)，本题 provenance=0（合成数据不需检索出处）；weights 归一化至 correctness:0.55, process:0.15, soft:0.10，合计 0.80，gap 0.20 归入 correctness；全过 R=1.00。",
+          "note": "合成时刻表内嵌 query，不需要 provenance 检索，权重集中在 correctness+process；机器判分占比 100% → 诚信 → 进 RL。"
+        }
+      }
+    ],
+    "is_noise": false
+  }
+]

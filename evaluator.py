@@ -17,9 +17,9 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime
-from typing import Any, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from openclaw_sdk.output.structured import StructuredOutput
 
@@ -40,45 +40,201 @@ eval_logger.propagate = False
 # 配置 / 结构化输出
 # ============================================================================
 
+class Rubric(BaseModel):
+    """单条结构化 rubric 准则。
+
+    向后兼容:纯字符串 rubric 经 `from_raw` 归一为 `when='final'/evaluator='llm_judge'` 的本模型。
+    - when: 仅用于识别 gate(参与一票否决);per_turn/final 一视同仁,均为参与加权的 reward 项。
+    - evaluator: 判定方式 program/oracle_cmp/llm_judge,投喂给 evaluator-agent 据以判 0/1。
+    - formula: 半形式化判据(伪代码 DSL,非可执行代码),供 evaluator 据语义精确比对。
+    - gt_ref: oracle 中对应 ground-truth 字段的引用路径(供 oracle_cmp 比对)。
+    """
+    id: str = Field(..., description="rubric 唯一标识(如 G1/PT2/C3)")
+    when: Literal["gate", "per_turn", "final"] = Field("final", description="gate=门禁/per_turn/final;仅 gate 参与一票否决")
+    evaluator: str = Field("llm_judge", description="判定方式:program/oracle_cmp/llm_judge")
+    text: str = Field("", description="rubric 自然语言描述(判什么)")
+    formula: Optional[str] = Field(None, description="半形式化判据(怎么判);非可执行代码")
+    gt_ref: Optional[str] = Field(None, description="oracle 中对应 ground-truth 字段的引用路径")
+
+    @classmethod
+    def from_raw(cls, raw: Any, idx: int) -> "Rubric":
+        """把一条原始 rubric(dict 或 str)归一为 Rubric。str → 旧式自由评估准则。"""
+        if isinstance(raw, dict):
+            data = dict(raw)
+            data.setdefault("id", f"R{idx}")
+            return cls(**data)
+        # 纯字符串:向后兼容旧格式
+        return cls(id=f"R{idx}", when="final", evaluator="llm_judge", text=str(raw))
+
+
+class BucketSpec(BaseModel):
+    """一个评分桶:权重 + 归属的 rubric id 列表。"""
+    weight: float = 0.0
+    rubric_ids: List[str] = Field(default_factory=list)
+
+
+class ScoringSpec(BaseModel):
+    """评分规格:聚合器(Scorer)的唯一输入,与 JSON 布局解耦。
+
+    解析层负责把 `scoring`(weights/bucket_map)+ rubric 的 when 归一为本模型;
+    聚合算法 MUST NOT 直接依赖字段在 JSON 中的位置——满足"权重位置后续会变"的抽象要求。
+    """
+    gate_ids: List[str] = Field(default_factory=list, description="when==gate 的 rubric id,参与一票否决")
+    buckets: Dict[str, BucketSpec] = Field(default_factory=dict, description="bucket 名 → {weight, rubric_ids}")
+    gate_zero: bool = Field(True, description="True=任一 gate 判 0 → completion=0")
+
+    @classmethod
+    def from_scoring(cls, scoring: Optional[dict], rubrics: List["Rubric"]) -> "ScoringSpec":
+        """据 scoring 块与 rubric 列表合成 ScoringSpec。
+
+        无 scoring(旧 config):退回"无 gate、所有非 gate rubric 归单桶等权",completion 仍可算。
+        """
+        gate_ids = [r.id for r in rubrics if r.when == "gate"]
+        if not scoring:
+            non_gate = [r.id for r in rubrics if r.when != "gate"]
+            buckets = {"default": BucketSpec(weight=1.0, rubric_ids=non_gate)} if non_gate else {}
+            return cls(gate_ids=gate_ids, buckets=buckets, gate_zero=bool(gate_ids))
+        weights = scoring.get("weights", {}) or {}
+        bucket_map = scoring.get("bucket_map", {}) or {}
+        buckets = {
+            name: BucketSpec(weight=float(weights.get(name, 0.0)), rubric_ids=list(ids))
+            for name, ids in bucket_map.items()
+        }
+        return cls(gate_ids=gate_ids, buckets=buckets, gate_zero=bool(scoring.get("gate_zero", True)))
+
+
+class Scorer:
+    """确定性评分聚合器:completion = (∏gate) × Σ_bucket[ w_bucket·(桶内通过/桶内总) ]。
+
+    权重在非空桶间归一化,保证全过 completion=1.0(空桶 total=0 不参与归一,见 design D2 与样本注脚)。
+    completion 取值域 0~1(非百分制)。
+    """
+
+    def __init__(self, spec: ScoringSpec):
+        self.spec = spec
+
+    def score(self, checks: Dict[str, int]) -> dict:
+        """据各条 rubric 的 0/1 判定算出 completion(0~1)与分桶得分。
+
+        checks: {rubric_id: 0|1}。缺失的 id 视为 0(未通过/核验受阻判 0)。
+        """
+        # gate:一票否决
+        gate_status = {gid: int(checks.get(gid, 0)) for gid in self.spec.gate_ids}
+        gate_passed = all(v == 1 for v in gate_status.values())
+
+        # 非 gate:按桶取通过比例,权重在非空桶间归一化后加权求和
+        active = {n: b for n, b in self.spec.buckets.items() if b.rubric_ids}
+        wsum = sum(b.weight for b in active.values()) or 1.0
+        bucket_scores: Dict[str, dict] = {}
+        weighted_sum = 0.0
+        for name, b in self.spec.buckets.items():
+            total = len(b.rubric_ids)
+            passed = sum(1 for i in b.rubric_ids if int(checks.get(i, 0)) == 1)
+            ratio = (passed / total) if total else 0.0
+            norm_w = (b.weight / wsum) if total else 0.0
+            contrib = norm_w * ratio
+            bucket_scores[name] = {
+                "passed": passed, "total": total, "ratio": ratio,
+                "weight": b.weight, "norm_weight": norm_w, "score": contrib,
+            }
+            weighted_sum += contrib
+
+        if self.spec.gate_zero and not gate_passed:
+            completion = 0.0
+        else:
+            completion = weighted_sum
+        completion = max(0.0, min(1.0, completion))
+        return {
+            "completion": round(completion, 4),
+            "bucket_scores": bucket_scores,
+            "gate_status": gate_status,
+            "gate_passed": gate_passed,
+        }
+
+
 class EvaluateConfig(BaseModel):
     """Per-query 评估配置(query 内联 `evaluate` 块)。
 
     出现该块即表示本 query 启用第三方 evaluator(不再有独立 enabled 开关)。
     `agent_name` 须取自顶层 `agents` 列表中的某个已声明 agent,且 ≠ 本 query 的执行 agent;
     其裁判模型在 agent 声明处经 `agents.update` 钉死(见 openclaw_automation._setup_*)。
+
+    字段别名(新名↔历史名,经 AliasChoices 等价):
+    - agent_name ↔ evaluator_agent
+    - eval_step ↔ evaluate_every_n_turns
+    - feedback_to_simulator ↔ feedback_to_user
     """
-    agent_name: str = Field("evaluator", description="充当 evaluator 的 OC agent 名(须取自 agents 列表,且 ≠ 执行 agent)")
+    model_config = ConfigDict(populate_by_name=True)
+
+    agent_name: str = Field(
+        "evaluator",
+        validation_alias=AliasChoices("agent_name", "evaluator_agent"),
+        description="充当 evaluator 的 OC agent 名(须取自 agents 列表,且 ≠ 执行 agent)",
+    )
     session_name: Optional[str] = Field(None, description="evaluator 会话名;None=复用 query.session_name 跟随被测会话")
-    rubrics: List[str] = Field(default_factory=list, description="验收清单:随 query 冻结,供逐条质检;空=自由维度评估")
-    eval_step: int = Field(1, ge=1, description="评审频率 X:每 X 个 turn 评一次;最近 X 轮投喂窗口的 X 同此值")
+    rubrics: List[str] = Field(default_factory=list, description="旧式字符串验收清单;新式结构化 rubric 走 rubrics_ref")
+    eval_step: int = Field(
+        1, ge=1,
+        validation_alias=AliasChoices("eval_step", "evaluate_every_n_turns"),
+        description="评审频率 X:每 X 个 turn 评一次;最近 X 轮投喂窗口的 X 同此值",
+    )
     feedback_to_simulator: bool = Field(
         False,
+        validation_alias=AliasChoices("feedback_to_simulator", "feedback_to_user"),
         description="True=评估反馈回流 simulator;False=只评估并落盘、不回流(安全默认,先行观测质量)",
     )
     log_evaluations: bool = Field(True, description="是否把每次评估落盘到 evaluator_use.log")
     review_subdir: str = Field("_under_review", description="推进 evaluator 工作区的被审查文件子目录")
 
+    # 新增:外部引用(相对 config 文件目录,由 ConfigLoader 解引用 pass 加载并填充运行时字段)
+    oracle_ref: Optional[str] = Field(None, description="ground-truth 文件相对路径,供 oracle_cmp 比对")
+    rubrics_ref: Optional[str] = Field(None, description="结构化 rubric 的 JSON-Pointer(形如 file.json#/a/b/c)")
+    scoring: Optional[dict] = Field(None, description="评分块:gate_zero/weights/bucket_map(原始,解析为 ScoringSpec)")
+
+    # 运行时字段(不来自 JSON,由解引用 pass 注入;exclude 不参与序列化)
+    structured_rubrics: List[Rubric] = Field(default_factory=list, exclude=True)
+    oracle_data: Optional[dict] = Field(None, exclude=True)
+    scoring_spec: Optional[ScoringSpec] = Field(None, exclude=True)
+
+    def rubric_items(self) -> List[Rubric]:
+        """统一返回结构化 rubric:优先 structured_rubrics,否则把旧式字符串 rubrics 归一。"""
+        if self.structured_rubrics:
+            return self.structured_rubrics
+        return [Rubric.from_raw(s, i) for i, s in enumerate(self.rubrics, 1)]
+
+    def resolve_runtime(self) -> None:
+        """据已加载的 rubrics_ref/rubrics 与 scoring 装配运行时字段(scoring_spec)。
+
+        oracle_data/structured_rubrics 由 ConfigLoader 在知晓 config 目录时填充;
+        本方法只做不依赖磁盘的最终合成(可重复调用)。
+        """
+        rubrics = self.rubric_items()
+        self.scoring_spec = ScoringSpec.from_scoring(self.scoring, rubrics)
+
 
 class RubricCheck(BaseModel):
-    """对单条 rubric 准则的逐条质检结果(随 query 传入的冻结清单逐条核验)。"""
+    """对单条 rubric 准则的逐条质检结果(0/1 二值)。"""
+    rubric_id: str = Field("", description="对应 rubric 的 id(如 C1);用于与 ScoringSpec 关联")
     criterion: str = Field(..., description="被核验的 rubric 准则原文")
-    status: Literal["pass", "fail", "partial", "unverifiable"] = Field(
-        ..., description="pass=满足/fail=不满足/partial=部分满足/unverifiable=核验受阻(同 evidence_incomplete,不判负)"
-    )
+    passed: int = Field(..., ge=0, le=1, description="1=通过 / 0=不通过(核验受阻一律判 0)")
     evidence: str = Field("", description="引证:支撑本条裁定的轨迹语句/工具返回/文件内容")
 
 
 class EvaluationResult(BaseModel):
-    """evaluator 的结构化裁决(D9)。"""
-    completion: int = Field(..., description="任务完成度 0-100")
+    """evaluator 的结构化裁决。completion 由 Scorer 算出(非模型自报)。"""
+    completion: float = Field(..., description="任务完成度 0~1(非百分制);最终由 Scorer 覆盖")
     inclination: str = Field(..., description="整体倾向:accept(可放行)/reject(应继续)/uncertain")
     improvements: list[str] = Field(default_factory=list, description="改进点")
     violations: list[str] = Field(default_factory=list, description="不符合要求项")
     citations: list[str] = Field(default_factory=list, description="引证:引用轨迹语句/工具返回/文件内容")
     rubric_checks: list[RubricCheck] = Field(
-        default_factory=list, description="逐条 rubric 质检结果;无冻结 rubric 时为空"
+        default_factory=list, description="逐条 rubric 质检结果(0/1);无冻结 rubric 时为空"
     )
     reason: str = Field("", description="总体理由")
+
+    # Scorer 注入(非模型输出;默认空,evaluate_turn 中据 rubric_checks 算出后覆盖)
+    bucket_scores: dict = Field(default_factory=dict, description="分桶得分(Scorer 算出)")
+    gate_status: dict = Field(default_factory=dict, description="各 gate 项 0/1 状态(Scorer 算出)")
 
 
 DEFAULT_EVAL_PROMPT = """你是一个独立、严格的任务评估专家(Evaluator),独立于对话中的"用户"和"执行 agent"。
@@ -127,6 +283,9 @@ class Evaluator:
         # 否则回退内置 DEFAULT_EVAL_PROMPT。注:本网关下 agent 的 system_prompt 不会下发到
         # OC 层,这里把它复用为评估指令模板(作为每轮 user 消息注入),使该配置真正生效。
         self._prompt_template = system_prompt or DEFAULT_EVAL_PROMPT
+        # 确定性评分聚合器:由 ScoringSpec 驱动 (∏gate)×Σ桶加权;completion 由它算出而非模型自报
+        spec = config.scoring_spec or ScoringSpec.from_scoring(config.scoring, config.rubric_items())
+        self.scorer = Scorer(spec)
 
     @classmethod
     def create(
@@ -144,6 +303,7 @@ class Evaluator:
         """
         if config is None:
             return None
+        config.resolve_runtime()  # 兜底装配 scoring_spec(ConfigLoader 未调时)
         evaluator = cls(config, client, run_id, session_name, system_prompt)
         logger.info(
             "Evaluator 已启用(agent=%s,session=%s,eval_step=%d,feedback_to_simulator=%s)",
@@ -159,14 +319,14 @@ class Evaluator:
         self,
         trajectory: Trajectory,
         current_turn: TurnRecord,
-        rubric: Optional[list[str]] = None,
+        rubric: Optional[list[Rubric]] = None,
         window: int = 1,
     ) -> Optional[EvaluationResult]:
         """对当前进展做一次评估;失败返回 None(安全降级,不阻断任务)。
 
         持久 agent + 每轮 reset:先清空会话防判词锚定,再投喂压缩 trajectory
-        (origin_query + rubrics + 最近 window 轮含 tool_calls + 产物指针)。
-        rubric: 随 query 冻结的验收清单;非空时逐条质检。window: 最近投喂轮数(=eval_step)。
+        (origin_query + 结构化 rubric + oracle + 最近 window 轮含 tool_calls + 产物指针)。
+        rubric: 随 query 冻结的结构化验收清单;非空时逐条判 0/1 并由 Scorer 算 completion。
         """
         # 持久 agent:同一 query 复用同一会话名(不每轮新建)
         eval_agent = self.client.get_agent(self.config.agent_name, self.session_name)
@@ -196,6 +356,14 @@ class Evaluator:
         # 仅归一、不判负/不重试,且置于落盘之前以保证评估日志干净。
         if not rubric:
             result.rubric_checks = []
+        else:
+            # 二值化聚合:从逐条 0/1 判定算出 completion(覆盖模型自报值)。
+            # checks 按 rubric_id 关联;模型漏填 id 时按顺序回填,缺失项由 Scorer 视为 0。
+            checks = self._collect_checks(result.rubric_checks, rubric)
+            scored = self.scorer.score(checks)
+            result.completion = scored["completion"]
+            result.bucket_scores = scored["bucket_scores"]
+            result.gate_status = scored["gate_status"]
 
         self._log(trajectory, current_turn, result, window=window, prompt_chars=prompt_chars)
 
@@ -210,6 +378,23 @@ class Evaluator:
 
         return result
 
+    @staticmethod
+    def _collect_checks(checks_out: list[RubricCheck], rubric: list[Rubric]) -> Dict[str, int]:
+        """把模型逐条裁定收敛为 {rubric_id: 0|1}。
+
+        优先按模型回填的 `rubric_id` 关联;模型漏填 id 时按输出顺序回填到 rubric;
+        缺失的准则交由 Scorer 视为 0(核验受阻判 0)。
+        """
+        by_id: Dict[str, int] = {}
+        for rc in checks_out:
+            if rc.rubric_id:
+                by_id[rc.rubric_id] = int(rc.passed)
+        if len(by_id) < len(rubric):
+            for i, rc in enumerate(checks_out):
+                if not rc.rubric_id and i < len(rubric):
+                    by_id.setdefault(rubric[i].id, int(rc.passed))
+        return by_id
+
     def format_feedback(self, ev: EvaluationResult) -> str:
         """把结构化裁决转成给 simulator 看的简洁反馈文本。
 
@@ -217,7 +402,7 @@ class Evaluator:
         未满足项/改进点/引证,**故意不渲染** `ev.rubric_checks`——逐条 rubric
         结果(含准则原文)只进评估日志,不回流 simulator。
         """
-        lines = [f"完成度: {ev.completion}/100 ｜ 倾向: {ev.inclination}"]
+        lines = [f"完成度: {ev.completion} ｜ 倾向: {ev.inclination}"]
         if ev.violations:
             lines.append("不符合要求项:\n- " + "\n- ".join(ev.violations))
         if ev.improvements:
@@ -256,7 +441,7 @@ class Evaluator:
     def _build_prompt(
         self,
         trajectory: Trajectory,
-        rubric: Optional[list[str]] = None,
+        rubric: Optional[list[Rubric]] = None,
         window: int = 1,
     ) -> str:
         """构建压缩投喂:origin_query + 最近 window 轮(含 tool_calls)+ 产物指针 + rubrics。
@@ -281,17 +466,31 @@ class Evaluator:
                 f"{ptr_lines}"
             )
         if rubric:
-            criteria = "\n".join(f"{i}. {c}" for i, c in enumerate(rubric, 1))
+            # 投喂 Oracle ground-truth(供 oracle_cmp/program 类据 formula 与 gt_ref 精确比对)
+            oracle = getattr(self.config, "oracle_data", None)
+            if oracle:
+                parts.append(
+                    "\n# Ground-Truth(Oracle)\n"
+                    "以下为本任务的标准答案。`oracle_cmp`/`program` 类准则 MUST 据其对应 `gt_ref` 字段做精确比对:\n"
+                    f"```json\n{json.dumps(oracle, ensure_ascii=False, indent=2)}\n```"
+                )
+            # 统一以 JSON 投喂(与上面 Oracle 块同构),不再做文本扁平化转换:
+            # 保留 rubric 的原始结构(id/when/evaluator/text/formula/gt_ref),供 agent 精确解析。
+            criteria = json.dumps(
+                [r.model_dump(exclude_none=True) for r in rubric],
+                ensure_ascii=False, indent=2,
+            )
             parts.append(
-                "\n# 验收清单(Rubric · 逐条质检)\n"
-                "以下是本任务的固定验收准则。你 MUST 对**每一条**基于可核验证据逐条裁定,"
-                "并把结果写入结构化输出的 `rubric_checks`(每条含 criterion/status/evidence):\n"
-                f"{criteria}\n"
-                "状态取值:pass=满足 / fail=不满足 / partial=部分满足 / "
-                "unverifiable=核验受阻。\n"
-                "铁律:`unverifiable` 与「证据不完整(evidence_incomplete)」同源——"
-                "核验受阻 MUST NOT 当作 `fail` 据以判负,避免冤枉掉线的 harness。"
-                "每条都要在 evidence 里引用本轮证据中的具体依据。"
+                "\n# 验收清单(Rubric · 逐条 0/1 判定)\n"
+                "以下是本任务的固定验收准则(JSON 数组)。你 MUST 对**每一条**基于可核验证据(工具记录/磁盘真相/上面的 Oracle)逐条裁定,"
+                "把结果写入结构化输出的 `rubric_checks`,每条含 `rubric_id`(照抄下面的 id)、`criterion`、"
+                "`passed`(1=通过 / 0=不通过)、`evidence`:\n"
+                f"```json\n{criteria}\n```\n"
+                "判定规则:\n"
+                "- `program`/`oracle_cmp` 类:严格据 `formula` 与 Oracle 的 `gt_ref` 字段做精确比对,得 1 或 0。\n"
+                "- 核验受阻(证据缺失/文件读不到)一律判 `passed=0`,MUST NOT 输出任何中间态。\n"
+                "- 每条都要在 `evidence` 里引用本轮证据中的具体依据。\n"
+                "注意:`completion` 取值域为 0~1(非百分制),且你给出的整体 `completion` 数值将被系统按权重公式覆盖——你只需保证每条 0/1 判定准确。"
             )
         else:
             # 无冻结 rubric:显式声明 rubric_checks 必须为空,避免模型把评估维度当准则自拟

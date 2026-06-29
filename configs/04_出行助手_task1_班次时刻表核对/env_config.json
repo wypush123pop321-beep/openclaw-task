@@ -1,0 +1,411 @@
+{
+  "system": {
+    "os": "Windows 10 专业版",
+    "os_version": "22H2 (19045.3803)",
+    "username": "chenming",
+    "display_name": "陈明",
+    "hostname": "CHEN-PM",
+    "timezone": "China Standard Time (UTC+8)",
+    "language": "zh-CN",
+    "install_date": "2023-01-15",
+    "last_boot": "2026-03-19 08:41:02",
+    "product_key_partial": "XXXXX-XXXXX-XXXXX-XXXXX-W269N"
+  },
+  "hardware": {
+    "cpu": "Intel Core i5-10400 @ 2.90GHz (6C/12T)",
+    "ram_gb": 16,
+    "storage": [
+      {
+        "drive": "C:",
+        "label": "系统",
+        "type": "NVMe SSD",
+        "size_gb": 512,
+        "free_gb": 245
+      },
+      {
+        "drive": "D:",
+        "label": "工作资料",
+        "type": "SATA SSD",
+        "size_gb": 1000,
+        "free_gb": 712
+      },
+      {
+        "drive": "E:",
+        "label": "备份归档",
+        "type": "SATA HDD",
+        "size_gb": 2000,
+        "free_gb": 1684
+      }
+    ],
+    "display": "1920x1080 @75Hz AOC 24英寸 IPS",
+    "gpu": "NVIDIA GeForce GTX 1650 4GB",
+    "network_adapters": [
+      "Realtek RTL8822CE 802.11ac Wireless",
+      "Realtek PCIe GbE Family Controller"
+    ]
+  },
+  "installed_software": [
+    {
+      "name": "Microsoft Office 2021",
+      "version": "16.0.14332.20447",
+      "install_date": "2023-01-20",
+      "category": "办公软件",
+      "publisher": "Microsoft Corporation"
+    },
+    {
+      "name": "WPS Office 2019",
+      "version": "11.1.0.15120",
+      "install_date": "2023-01-20",
+      "category": "办公软件",
+      "publisher": "珠海金山办公软件有限公司"
+    },
+    {
+      "name": "钉钉",
+      "version": "7.1.0.11",
+      "install_date": "2023-02-01",
+      "category": "办公协同",
+      "publisher": "钉钉(中国)信息技术有限公司"
+    },
+    {
+      "name": "飞书",
+      "version": "7.9.6",
+      "install_date": "2023-03-08",
+      "category": "办公协同",
+      "publisher": "北京字节跳动科技有限公司"
+    },
+    {
+      "name": "企业微信",
+      "version": "4.1.16.6011",
+      "install_date": "2023-02-05",
+      "category": "办公协同",
+      "publisher": "腾讯科技(深圳)有限公司"
+    },
+    {
+      "name": "Axure RP 10",
+      "version": "10.0.0.3879",
+      "install_date": "2023-02-18",
+      "category": "原型设计",
+      "publisher": "Axure Software Solutions"
+    },
+    {
+      "name": "墨刀",
+      "version": "0.10.16",
+      "install_date": "2023-04-02",
+      "category": "原型设计",
+      "publisher": "万兴科技"
+    },
+    {
+      "name": "XMind",
+      "version": "23.09.11172",
+      "install_date": "2023-03-15",
+      "category": "效率工具",
+      "publisher": "XMind Ltd."
+    },
+    {
+      "name": "Notion",
+      "version": "2.3.2",
+      "install_date": "2023-05-10",
+      "category": "效率工具",
+      "publisher": "Notion Labs, Inc."
+    },
+    {
+      "name": "微信",
+      "version": "3.9.8.25",
+      "install_date": "2023-01-16",
+      "category": "通讯社交",
+      "publisher": "腾讯科技(深圳)有限公司"
+    },
+    {
+      "name": "腾讯QQ",
+      "version": "9.8.9.28887",
+      "install_date": "2023-01-17",
+      "category": "通讯社交",
+      "publisher": "深圳市腾讯计算机系统有限公司"
+    },
+    {
+      "name": "Google Chrome",
+      "version": "120.0.6099.130",
+      "install_date": "2023-01-16",
+      "category": "网络浏览",
+      "publisher": "Google LLC"
+    },
+    {
+      "name": "Microsoft Edge",
+      "version": "120.0.2210.91",
+      "install_date": "2023-01-15",
+      "category": "网络浏览",
+      "publisher": "Microsoft Corporation"
+    },
+    {
+      "name": "Visual Studio Code",
+      "version": "1.85.1",
+      "install_date": "2023-06-12",
+      "category": "开发工具",
+      "publisher": "Microsoft Corporation"
+    },
+    {
+      "name": "Python",
+      "version": "3.12.1",
+      "install_date": "2023-06-12",
+      "category": "开发工具",
+      "publisher": "Python Software Foundation"
+    },
+    {
+      "name": "Navicat Premium",
+      "version": "16.3.3",
+      "install_date": "2023-07-20",
+      "category": "数据库工具",
+      "publisher": "PremiumSoft CyberTech Ltd."
+    },
+    {
+      "name": "Snipaste",
+      "version": "2.8.9",
+      "install_date": "2023-02-22",
+      "category": "效率工具",
+      "publisher": "Le Liu"
+    },
+    {
+      "name": "百度网盘",
+      "version": "7.38.0.6",
+      "install_date": "2023-01-19",
+      "category": "云存储",
+      "publisher": "北京百度网讯科技有限公司"
+    },
+    {
+      "name": "搜狗输入法",
+      "version": "14.3.0.9129",
+      "install_date": "2023-01-16",
+      "category": "输入法",
+      "publisher": "搜狗科技发展有限公司"
+    },
+    {
+      "name": "360安全卫士",
+      "version": "13.1.0.2008",
+      "install_date": "2023-01-16",
+      "category": "系统安全",
+      "publisher": "北京奇虎科技有限公司"
+    },
+    {
+      "name": "7-Zip",
+      "version": "23.01",
+      "install_date": "2023-01-18",
+      "category": "压缩工具",
+      "publisher": "Igor Pavlov"
+    },
+    {
+      "name": "网易云音乐",
+      "version": "2.10.12.201026",
+      "install_date": "2023-07-05",
+      "category": "影音娱乐",
+      "publisher": "杭州网易云音乐科技有限公司"
+    },
+    {
+      "name": "腾讯会议",
+      "version": "3.19.0.401",
+      "install_date": "2023-02-10",
+      "category": "视频会议",
+      "publisher": "腾讯科技(深圳)有限公司"
+    },
+    {
+      "name": "Adobe Acrobat Reader DC",
+      "version": "23.008.20470",
+      "install_date": "2023-01-25",
+      "category": "文档阅读",
+      "publisher": "Adobe Inc."
+    }
+  ],
+  "browser": {
+    "default": "Google Chrome",
+    "version": "120.0.6099.130",
+    "bookmarks": [
+      "12306铁路客户服务中心 - 12306.cn",
+      "携程旅行 - ctrip.com",
+      "高德地图网页版 - amap.com",
+      "飞猪旅行 - fliggy.com",
+      "航旅纵横 - umetrip.com",
+      "差旅管理后台 - 公司SSO登录",
+      "钉钉工作台 - work.dingtalk.com",
+      "飞书云文档 - feishu.cn",
+      "Tower项目协作 - tower.im",
+      "禅道项目管理 - zentao.net",
+      "Axure Cloud - share.axure.com",
+      "蓝湖设计协作 - lanhuapp.com",
+      "墨刀原型 - modao.cc",
+      "语雀知识库 - yuque.com",
+      "Notion - notion.so",
+      "GrowingIO数据看板 - growingio.com",
+      "神策数据后台 - sensorsdata.cn",
+      "阿里云控制台 - console.aliyun.com",
+      "GitHub - github.com",
+      "Stack Overflow - stackoverflow.com",
+      "得到App网页版 - dedao.cn",
+      "人人都是产品经理 - woshipm.com",
+      "京东商城 - jd.com",
+      "支付宝 - alipay.com",
+      "招商银行网银 - cmbchina.com"
+    ],
+    "extensions": [
+      "AdBlock - 广告拦截器",
+      "沙拉查词 - 聚合词典划词翻译",
+      "Tampermonkey - 油猴脚本管理器",
+      "OneTab - 标签页管理",
+      "彩云小译 - 网页翻译",
+      "JSON Viewer",
+      "Notion Web Clipper",
+      "Momentum 新标签页"
+    ],
+    "history_summary": "差旅出行平台(28%), 项目协作与文档(26%), 数据分析后台(18%), 原型设计工具(14%), 其他(14%)"
+  },
+  "recent_files": [
+    "D:\\出行\\杭州东-上海虹桥车次.csv",
+    "D:\\出行\\2026Q1差旅行程表.xlsx",
+    "C:\\Users\\chenming\\Documents\\产品需求文档_V3.2.docx",
+    "D:\\项目\\用户增长\\需求池_2026.xlsx",
+    "C:\\Users\\chenming\\Desktop\\迭代评审会议纪要_0319.docx",
+    "D:\\项目\\原型\\订单中心改版_v5.rp",
+    "C:\\Users\\chenming\\Documents\\差旅报销_2026年3月.xlsx",
+    "D:\\项目\\数据\\北极星指标周报_W11.xlsx",
+    "C:\\Users\\chenming\\Downloads\\竞品分析报告_2026Q1.pdf",
+    "D:\\出行\\常住酒店与报销标准.md"
+  ],
+  "desktop_shortcuts": [
+    "Microsoft Edge",
+    "Google Chrome",
+    "钉钉",
+    "飞书",
+    "企业微信",
+    "微信",
+    "Axure RP 10",
+    "墨刀",
+    "XMind",
+    "Visual Studio Code",
+    "WPS Office",
+    "腾讯会议",
+    "百度网盘",
+    "Snipaste",
+    "此电脑",
+    "回收站"
+  ],
+  "startup_programs": [
+    {
+      "name": "微信",
+      "path": "C:\\Program Files (x86)\\Tencent\\WeChat\\WeChat.exe",
+      "enabled": true
+    },
+    {
+      "name": "企业微信",
+      "path": "C:\\Program Files (x86)\\WXWork\\WXWork.exe",
+      "enabled": true
+    },
+    {
+      "name": "钉钉",
+      "path": "C:\\Program Files (x86)\\DingDing\\DingtalkLauncher.exe",
+      "enabled": true
+    },
+    {
+      "name": "搜狗输入法",
+      "path": "C:\\Program Files (x86)\\SogouInput\\SogouCloud.exe",
+      "enabled": true
+    },
+    {
+      "name": "360安全卫士",
+      "path": "C:\\Program Files\\360\\360Safe\\safemon\\360Tray.exe",
+      "enabled": true
+    },
+    {
+      "name": "百度网盘",
+      "path": "C:\\Users\\chenming\\AppData\\Roaming\\BaiduYunGuanjia\\BaiduYunGuanjia.exe",
+      "enabled": false
+    },
+    {
+      "name": "NVIDIA GeForce Experience",
+      "path": "C:\\Program Files\\NVIDIA Corporation\\NVIDIA GeForce Experience\\NVIDIA GeForce Experience.exe",
+      "enabled": true
+    },
+    {
+      "name": "Realtek HD Audio Manager",
+      "path": "C:\\Program Files\\Realtek\\Audio\\HDA\\RtkNGUI64.exe",
+      "enabled": true
+    }
+  ],
+  "scheduled_tasks": [
+    {
+      "name": "差旅行程提醒",
+      "schedule": "每天 07:30",
+      "action": "显示当日行程与待办出差安排",
+      "enabled": true
+    },
+    {
+      "name": "工作资料增量备份",
+      "schedule": "每天 23:30",
+      "action": "将D盘工作资料增量备份到E盘",
+      "enabled": true
+    },
+    {
+      "name": "周报数据拉取",
+      "schedule": "每周五 17:30",
+      "action": "提醒导出本周北极星指标数据",
+      "enabled": true
+    },
+    {
+      "name": "系统垃圾清理",
+      "schedule": "每周日 22:00",
+      "action": "运行360安全卫士清理功能",
+      "enabled": true
+    },
+    {
+      "name": "Windows更新检查",
+      "schedule": "每周三 02:00",
+      "action": "检查并安装Windows系统更新",
+      "enabled": false
+    }
+  ],
+  "network": {
+    "hostname": "CHEN-PM",
+    "ip_address": "192.168.1.88",
+    "dns": [
+      "192.168.1.1",
+      "114.114.114.114"
+    ],
+    "wifi_profiles": [
+      "Company-Office-5G",
+      "Company-Office-2.4G",
+      "CHEN-Home-WiFi6",
+      "陈明的iPhone",
+      "CMCC-酒店WiFi"
+    ],
+    "proxy": {
+      "enabled": false,
+      "host": "",
+      "port": 0
+    }
+  },
+  "environment_variables": {
+    "USERPROFILE": "C:\\Users\\chenming",
+    "APPDATA": "C:\\Users\\chenming\\AppData\\Roaming",
+    "LOCALAPPDATA": "C:\\Users\\chenming\\AppData\\Local",
+    "TEMP": "C:\\Users\\chenming\\AppData\\Local\\Temp",
+    "TMP": "C:\\Users\\chenming\\AppData\\Local\\Temp",
+    "PUBLIC": "C:\\Users\\Public",
+    "PROGRAMFILES": "C:\\Program Files",
+    "PROGRAMFILES(X86)": "C:\\Program Files (x86)",
+    "COMMONPROGRAMFILES": "C:\\Program Files\\Common Files",
+    "SYSTEMROOT": "C:\\Windows",
+    "PYTHON_HOME": "C:\\Program Files\\Python312"
+  },
+  "registry_notes": "已注册组件包括: 微软雅黑、思源黑体、阿里巴巴普惠体等中文字体; DirectX 12运行时; Visual C++ 2015-2022可再发行组件包; .NET Framework 4.8; Microsoft Office COM组件; 腾讯系软件COM组件(QQ、微信、企业微信协议支持); Python 3.12解释器及pip; Visual Studio Code扩展宿主; 搜狗输入法输入法引擎; 360安全组件及驱动; WPS Office文档处理组件",
+  "windows_features": [
+    "Windows Media Player",
+    "Internet Explorer 11",
+    ".NET Framework 3.5",
+    ".NET Framework 4.8 高级服务",
+    "Windows 照片查看器",
+    "打印和文档服务",
+    "远程桌面连接",
+    "Windows Defender防火墙",
+    "虚拟打印机 Microsoft Print to PDF",
+    "DirectX 12",
+    "适用于 Linux 的 Windows 子系统",
+    "蓝牙支持"
+  ]
+}
