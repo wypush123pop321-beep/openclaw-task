@@ -18,10 +18,15 @@ import sys
 import tempfile
 from user_simulator import User_simulator
 
-from pydantic import BaseModel, Field, validator, field_validator
-from openclaw_sdk import OpenClawClient, AgentConfig, ExecutionOptions
-from openclaw_sdk.core.types import ExecutionResult
-from openclaw_sdk.core.exceptions import GatewayError
+from pydantic import BaseModel, Field, validator, field_validator, model_validator
+
+from harness import (
+    AgentSpec,
+    Capability,
+    HarnessAdapter,
+    TurnResult,
+    create_adapter,
+)
 
 from trajectory import (
     Trajectory,
@@ -31,12 +36,6 @@ from trajectory import (
     extract_tool_calls,
 )
 from evaluator import Evaluator, EvaluateConfig, Rubric
-
-from utils.connection import (
-    build_openclaw_client,
-    gateway_http_base,
-    check_http_health,
-)
 
 
 
@@ -168,6 +167,17 @@ class QueryItem(BaseModel):
     evaluate: Optional[EvaluateConfig] = Field(None, description="第三方 evaluator 配置(query 内联块);为空则本 query 不评估。rubric/eval_step 等迁入此块")
 
 
+class HarnessConfig(BaseModel):
+    """Harness 选择 + 连接配置(D6)。
+
+    `type` 默认 `openclaw`;`connection` 为该 harness 的连接 dict(原样透传给 adapter)。
+    无 `harness` 段的旧 config 由 `AutomationConfig._fold_harness_connection` 把顶层连接
+    字段折叠成默认 openclaw 的 `harness`,使现存 config 无需修改即可运行。
+    """
+    type: str = Field("openclaw", description="harness 类型(openclaw/hermes/...)")
+    connection: Dict[str, Any] = Field(default_factory=dict, description="该 harness 的连接配置(透传 adapter)")
+
+
 class AutomationConfig(BaseModel):
     """完整的自动化配置"""
     system: SystemConfig = Field(default_factory=SystemConfig)
@@ -175,7 +185,10 @@ class AutomationConfig(BaseModel):
     agents: List[AgentConfigItem] = Field(default_factory=list)
     queries: List[QueryItem] = Field(default_factory=list)
 
-    # OpenClaw 连接配置
+    # Harness 选择 + 连接(默认 openclaw;无该段时由顶层连接字段折叠而来)
+    harness: Optional[HarnessConfig] = Field(None, description="harness 选择与连接;缺省时折叠顶层连接字段为 openclaw")
+
+    # OpenClaw 连接配置(后向兼容:无 harness 段时折叠进 harness.connection)
     gateway_ws_url: Optional[str] = Field(None, description="WebSocket 网关 URL")
     api_key: Optional[str] = Field(None, description="API Key")
     gateway_timeout: Optional[int] = Field(None, description="Gateway 连接/调用超时(秒)")
@@ -201,6 +214,29 @@ class AutomationConfig(BaseModel):
             return url.rstrip("/") + "/gateway"
 
         return url
+
+    @model_validator(mode="after")
+    def _fold_harness_connection(self) -> "AutomationConfig":
+        """无 `harness` 段时把顶层连接字段折叠成默认 openclaw 的 harness(D6 后向兼容)。
+
+        有显式 `harness` 段则原样保留(不覆盖);顶层连接字段对 openclaw 仍兼容补齐
+        (connection 未显式给出的键由顶层填充)。
+        """
+        top_conn = {
+            "gateway_ws_url": self.gateway_ws_url,
+            "api_key": self.api_key,
+            "gateway_timeout": self.gateway_timeout,
+            "workspace_base": self.workspace_base,
+        }
+        if self.harness is None:
+            # 旧 config:默认 openclaw,折叠顶层连接字段
+            self.harness = HarnessConfig(type="openclaw", connection=dict(top_conn))
+        elif self.harness.type == "openclaw":
+            # 显式声明 openclaw:顶层连接字段补齐 connection 未显式给出的键
+            merged = dict(top_conn)
+            merged.update(self.harness.connection or {})
+            self.harness.connection = merged
+        return self
 
 
 # ============================================================================
@@ -422,7 +458,7 @@ def create_simulator(config: "AutomationConfig") -> Optional[User_simulator]:
 
 def create_evaluator(
     evaluate: Optional[EvaluateConfig],
-    client: Any,
+    adapter: HarnessAdapter,
     run_id: str,
     query_session: str,
     system_prompt: Optional[str] = None,
@@ -437,98 +473,66 @@ def create_evaluator(
         return None
     base = evaluate.session_name or query_session
     session_name = f"eval_{base}_{run_id}"
-    return Evaluator.create(evaluate, client, run_id, session_name, system_prompt)
+    return Evaluator.create(evaluate, adapter, run_id, session_name, system_prompt)
 
 
 # ============================================================================
 # Agent 管理器
 # ============================================================================
 
-class AgentManager:
-    """管理 Agent 的创建和注册"""
+def _compose_model(agent_config: AgentConfigItem) -> Optional[str]:
+    """组装 `AgentSpec.model` 模型串(provider 前缀拼装 + base_url/api_key 信息性提示)。
 
-    def __init__(self, client: OpenClawClient, workspace_manager: WorkspaceManager):
-        self.client = client
+    - 已带 'provider/' 前缀则原样;否则用 model_provider 拼 'provider/model'。
+    - base_url/api_key 不经 harness 下发(本网关整份回写被拒):仅打信息日志,提示在网关侧
+      `config.models.providers.<provider>` 配置;模型 + provider 选择经 adapter 钉死。
+    """
+    model = agent_config.model
+    if not model:
+        return None
+    if "/" not in model and agent_config.model_provider:
+        model = f"{agent_config.model_provider}/{model}"
+    if agent_config.base_url or agent_config.api_key:
+        prov = agent_config.model_provider or (model.split("/", 1)[0] if "/" in model else "<provider>")
+        logger.info(
+            "agent '%s' 的 baseUrl/api_key 不经 harness 下发(本网关整份回写被拒);"
+            "请在网关侧 `config.models.providers.%s` 配置 baseUrl/apiKey,本 agent 仅引用模型串 '%s'",
+            agent_config.name, prov, model,
+        )
+    return model
+
+
+class AgentManager:
+    """管理 Agent 的创建和注册(经中立 `HarnessAdapter` 供给)"""
+
+    def __init__(self, adapter: HarnessAdapter, workspace_manager: WorkspaceManager):
+        self.adapter = adapter
         self.workspace_manager = workspace_manager
 
     async def setup_agent(self, agent_config: AgentConfigItem) -> None:
-        """设置单个 Agent
+        """设置单个 Agent(经 `adapter.ensure_agent` 供给 + 按 spec.model 钉模型)
 
         Args:
             agent_config: Agent 配置
         """
-        agent_name = agent_config.name
-        logger.info("设置 Agent: %s", agent_name)
-
-        existing_ids = {a.agent_id for a in await self.client.list_agents()}
-
-        if agent_name not in existing_ids:
-            workspace = self.workspace_manager.get_agent_workspace(agent_name)
-            # SDK 的 create_agent 不从 AgentConfig 读 workspace,必须显式传 kwarg,
-            # 否则 gateway 收到 "." → 解析为其自身 cwd(可能是 system32)→ EPERM。
-            await self.client.create_agent(
-                AgentConfig(
-                    agent_id=agent_name,
-                    workspace=str(workspace),
-                ),
-                workspace=str(workspace),
-            )
-            logger.info("创建新 Agent: %s,等待 gateway 重启就绪...", agent_name)
-            await self._wait_gateway_ready()
-
-        # 钉死模型:agents.create 不下发模型,改用 agents.update 下发(网关侧认 camelCase
-        # model/modelProvider/apiKey)。evaluator 即靠此钉死独立的 flash 级裁判模型。
-        if agent_config.model:
-            await self._pin_model(agent_config)
-
-    async def _pin_model(self, agent_config: AgentConfigItem) -> None:
-        """钉死 agent 的模型(经 agents.update,本网关唯一可靠的 per-agent 通道)。
-
-        本网关事实(已实测探明):
-        - `agents.update` 只认 `model`,但 model **可带 provider 前缀** `"provider/model"`,
-          据此 per-agent 选择**已在网关侧定义**的 provider(provider 携带 baseUrl/apiKey)。
-        - provider 的 baseUrl/apiKey 定义在 `config.models.providers.<provider>`,须网关侧配置:
-          本网关 `config.set/patch` 整份回写被拒(invalid config),SDK 的 `set_agent_model`
-          又与本网关 `agents={defaults,list}` 结构不兼容,二者均不可用于 per-agent 下发 url/key。
-
-        故:模型名 + provider 选择经 agents.update 下发;新 provider 的 url/key 须网关侧配。
-        """
-        # 组装模型串:已带 'provider/' 前缀则原样;否则用 model_provider 拼 'provider/model'
-        model = agent_config.model
-        if model and "/" not in model and agent_config.model_provider:
-            model = f"{agent_config.model_provider}/{model}"
-
-        if agent_config.base_url or agent_config.api_key:
-            prov = agent_config.model_provider or (model.split("/", 1)[0] if model and "/" in model else "<provider>")
-            logger.info(
-                "agent '%s' 的 baseUrl/api_key 不经 harness 下发(本网关整份回写被拒);"
-                "请在网关侧 `config.models.providers.%s` 配置 baseUrl/apiKey,本 agent 仅引用模型串 '%s'",
-                agent_config.name, prov, model,
-            )
-        try:
-            resp = await self.client.gateway.agents_update(agent_config.name, model=model)
-            logger.info(
-                "已为 agent '%s' 钉死模型=%s(agents.update 返回: %s)",
-                agent_config.name, model, resp,
-            )
-        except Exception as e:  # noqa: BLE001
-            logger.error(
-                "为 agent '%s' 下发模型=%s 失败(MUST NOT 静默退回默认): %s",
-                agent_config.name, model, e,
-            )
-
-    async def _wait_gateway_ready(self, wait: float = 90.0) -> None:
-        """创建 agent 后 gateway 会重启,固定等待一段时间让其就绪。"""
-        logger.info("等待 gateway 重启就绪,固定等待 %ds ...", int(wait))
-        await asyncio.sleep(wait)
-        logger.info("gateway 等待完成")
+        workspace = self.workspace_manager.get_agent_workspace(agent_config.name)
+        spec = AgentSpec(
+            name=agent_config.name,
+            workspace=str(workspace),
+            config_files=list(agent_config.config),
+            skills=list(agent_config.skills),
+            model=_compose_model(agent_config),
+        )
+        # ensure_agent 内部收纳 create_agent + gateway 重启等待 + 按 spec.model 钉模型
+        # (evaluator 即靠此钉死独立的 flash 级裁判模型)。
+        await self.adapter.ensure_agent(spec)
 
 
 # ============================================================================
 # 查询执行
 # ============================================================================
 
-def _replace_variables(text: str, results: Dict[str, ExecutionResult]) -> str:
+def _replace_variables(text: str, results: Dict[str, TurnResult]) -> str:
     """替换查询文本中的变量,支持 {result_agent_name}"""
     pattern = r'\{result_(\w+)\}'
 
@@ -568,9 +572,9 @@ def _restore_eval_files(evaluate: Optional[EvaluateConfig]) -> None:
     """
     if evaluate is None or not evaluate.isolate_eval_files:
         return
-    for path, raw_text in evaluate.file_vault.items():
+    for path, raw_bytes in evaluate.file_vault.items():
         try:
-            Path(path).write_text(raw_text, encoding="utf-8")
+            Path(path).write_bytes(raw_bytes)  # 逐字节回写,与原文件(含 BOM)一致
             logger.debug("[文件隔离] 已还原: %s", path)
         except OSError as e:  # noqa: BLE001
             logger.warning("[文件隔离] 还原失败(忽略): %s (%s)", path, e)
@@ -593,27 +597,33 @@ def _new_messages_since(
     ]
 
 
-async def _safe_chat_history(agent) -> List[dict[str, Any]]:
-    """安全拉取被测 agent 会话历史(失败降级为空,绝不中断主流程)。"""
+async def _safe_fetch_history(
+    adapter: HarnessAdapter, agent: str, session: str
+) -> List[dict[str, Any]]:
+    """安全拉取被测 agent 会话历史(经 adapter 的 HISTORY_FALLBACK 能力)。
+
+    缺该能力或失败均降级为空,绝不中断主流程。
+    """
+    if Capability.HISTORY_FALLBACK not in getattr(adapter, "capabilities", frozenset()):
+        return []
     try:
-        return await agent._client.gateway.chat_history(
-            agent.session_key, limit=EXECUTION_HISTORY_FALLBACK_LIMIT
+        return await adapter.fetch_history(
+            agent, session, limit=EXECUTION_HISTORY_FALLBACK_LIMIT
         )
     except Exception as e:  # noqa: BLE001
-        logger.debug("chat_history 采集失败: %s", e)
+        logger.debug("fetch_history 采集失败: %s", e)
         return []
 
 
 async def process_turn(
-    client: OpenClawClient,
+    adapter: HarnessAdapter,
     query: QueryItem,
     turn: int,
     current_query: str,
-    result: ExecutionResult,
-    evidence_incomplete: bool,
+    result: TurnResult,
     trajectory: Trajectory,
     evaluator: Optional[Evaluator],
-    agent: Any = None,
+    session: Optional[str] = None,
     before_history: Optional[List[dict[str, Any]]] = None,
 ) -> Optional[str]:
     """逐轮处理(仅多轮 simulator 路径):能力1 每轮捕获带证据轨迹 + 能力2 按 eval_step 节流评估。
@@ -628,14 +638,18 @@ async def process_turn(
     if evaluator is None:
         return None
 
-    # 能力1:从 OC chat_history 解析本轮新增工具调用(SDK 的 ExecutionResult.tool_calls
-    # 对服务端自主 agent 恒空),再逐轮捕获带证据的轨迹(文件证据升级为磁盘真相 D5)。
+    evidence_incomplete = result.evidence_incomplete
+
+    # 能力1:经 adapter 的 history 能力解析本轮新增工具调用(harness 原生 TurnResult.tool_calls
+    # 对服务端自主 agent 恒空),再逐轮捕获带证据的轨迹(文件证据升级为磁盘真相)。
     # 即便本轮不评审也要捕获,否则评审点窗口取不到中间轮数据。
     # before_history 须由调用方在 execute 之前采集(本轮基线),after 在此处取以截取增量。
+    # 无 HISTORY_FALLBACK 能力(如 Hermes):turn_tool_calls 留 None,
+    # 使 build_turn_record 回退 result.tool_calls(由该 harness 的执行结果直接携带)。
     turn_tool_calls: Optional[List[ToolCallEvidence]] = None
-    if agent is not None:
+    if session is not None and Capability.HISTORY_FALLBACK in getattr(adapter, "capabilities", frozenset()):
         try:
-            after_history = await _safe_chat_history(agent)
+            after_history = await _safe_fetch_history(adapter, query.agent_name, session)
             new_msgs = _new_messages_since(before_history or [], after_history)
             turn_tool_calls = extract_tool_calls(new_msgs)
             # 兜底但从 history 救回了工具证据 → 不再算"证据不完整"
@@ -648,7 +662,7 @@ async def process_turn(
         turn, current_query, result, evidence_incomplete, tool_calls=turn_tool_calls
     )
     try:
-        await capture_file_evidence(client.gateway, query.agent_name, turn_record)
+        await capture_file_evidence(adapter, query.agent_name, turn_record)
     except Exception as e:  # noqa: BLE001
         logger.debug("文件证据捕获失败: %s", e)
     trajectory.turns.append(turn_record)
@@ -685,13 +699,13 @@ async def process_turn(
 
 
 async def execute_queries(
-    client: OpenClawClient,
+    adapter: HarnessAdapter,
     queries: List[QueryItem],
     simulator_factory: Optional[Callable[[], Optional[User_simulator]]] = None,
     max_turn: int = 5,
     agent_system_prompts: Optional[Dict[str, str]] = None,
-) -> Dict[str, ExecutionResult]:
-    """执行查询任务列表
+) -> Dict[str, TurnResult]:
+    """执行查询任务列表(经中立 `HarnessAdapter` 驱动)
 
     外循环遍历每个 query;当 simulator 存在时,内循环进行多轮对话,
     受 max_turn 控制。每轮捕获带证据的轨迹;当 evaluator 启用时,逐轮评估并把
@@ -701,212 +715,34 @@ async def execute_queries(
     User_simulator 实例(合法续聊);不同会话名互不可见(杜绝跨会话信息泄露)。
 
     Args:
-        client: OpenClaw 客户端
+        adapter: 中立 harness 适配器(单轮执行/history/文件证据/会话重置等经其能力)
         queries: 查询任务列表
         simulator_factory: 构造 User_simulator 的工厂(每个 session 调用一次);
             返回 None 表示未启用 simulator → 仅单轮
         max_turn: 多轮对话最大轮次
-        evaluator: 第三方 Evaluator,None 或 disabled 则退回 simulator 自判
 
     Returns:
-        {result_agent_name: ExecutionResult}
+        {result_agent_name: TurnResult}
     """
     logger.info("=" * 60)
     logger.info("开始执行查询任务")
     logger.info("=" * 60)
 
-    results: Dict[str, ExecutionResult] = {}
+    results: Dict[str, TurnResult] = {}
 
     async def check_readyz() -> None:
-        """执行前 HTTP readyz 诊断日志(连接重连由 monkey-patch 自动处理)。"""
-        http_base = gateway_http_base(client.gateway)
-        if not http_base:
+        """执行前健康诊断日志(经 adapter 的 HEALTHZ 能力;缺该能力则跳过)。"""
+        if Capability.HEALTHZ not in getattr(adapter, "capabilities", frozenset()):
             return
-        _, ready, body = await check_http_health(http_base)
-        if ready:
-            logger.info("gateway readyz OK: %s", body)
+        try:
+            status = await adapter.health()
+        except Exception as e:  # noqa: BLE001
+            logger.debug("health 检查失败(忽略): %s", e)
+            return
+        if status.readiness:
+            logger.info("harness readyz OK: %s", status.detail)
         else:
-            logger.warning("gateway readyz 未就绪: %s", body)
-
-    async def execute_with_retry(
-        agent,
-        query_text: str,
-        options: Optional[ExecutionOptions],
-    ):
-        """执行查询,空 final 时先查 history 兜底,再有限重试。
-
-        Returns:
-            (ExecutionResult, evidence_incomplete): 第二个值为 True 表示该结果经
-            history_fallback 兜底恢复(只剩文本、无工具/文件证据),供轨迹捕获标记。
-        """
-        max_attempts = EXECUTION_MAX_ATTEMPTS
-
-        def extract_message_text(message: Any) -> str:
-            if not isinstance(message, dict):
-                return ""
-            content = message.get("content")
-            if isinstance(content, str):
-                return content.strip()
-            if isinstance(content, list):
-                parts = []
-                for block in content:
-                    if not isinstance(block, dict):
-                        continue
-                    text = block.get("text") or block.get("content")
-                    if isinstance(text, str):
-                        parts.append(text)
-                return "".join(parts).strip()
-            text = message.get("text")
-            return text.strip() if isinstance(text, str) else ""
-
-        def is_assistant_message(message: Any) -> bool:
-            return (
-                isinstance(message, dict)
-                and str(message.get("role", "")).lower() == "assistant"
-            )
-
-        async def fetch_history() -> List[dict[str, Any]]:
-            try:
-                return await agent._client.gateway.chat_history(  # type: ignore[attr-defined]
-                    agent.session_key,
-                    limit=EXECUTION_HISTORY_FALLBACK_LIMIT,
-                )
-            except Exception as e:
-                logger.debug("chat.history 兜底查询失败: %s", e)
-                return []
-
-        def find_new_assistant_text(
-            before: List[dict[str, Any]],
-            after: List[dict[str, Any]],
-        ) -> str:
-            before_signatures = {
-                (
-                    str(message.get("role", "")),
-                    extract_message_text(message),
-                    str(message.get("timestamp", "")),
-                    str(message.get("id", "")),
-                )
-                for message in before
-                if isinstance(message, dict)
-            }
-            new_messages = []
-            for message in after:
-                if not isinstance(message, dict):
-                    continue
-                signature = (
-                    str(message.get("role", "")),
-                    extract_message_text(message),
-                    str(message.get("timestamp", "")),
-                    str(message.get("id", "")),
-                )
-                if signature not in before_signatures:
-                    new_messages.append(message)
-            for message in reversed(new_messages):
-                if is_assistant_message(message):
-                    text = extract_message_text(message)
-                    if text:
-                        return text
-            return ""
-
-        async def history_fallback(
-            before_history: List[dict[str, Any]],
-            max_polls: int = EXECUTION_HISTORY_FALLBACK_MAX_POLLS,
-            poll_interval: float = EXECUTION_HISTORY_FALLBACK_POLL_INTERVAL_SECONDS,
-        ) -> Optional[str]:
-            """轮询 chat.history 等待旧 run 完成。
-
-            agent 长任务可能还在后台执行（WS 断开但 run 没停），
-            不能只查一次就放弃——需要多轮轮询直到出现新的 assistant 回复。
-            """
-            for poll in range(1, max_polls + 1):
-                await asyncio.sleep(poll_interval)
-                try:
-                    after_history = await fetch_history()
-                except Exception as e:
-                    logger.debug("history_fallback 第 %d/%d 次查询失败: %s", poll, max_polls, e)
-                    continue
-                text = find_new_assistant_text(before_history, after_history)
-                if text:
-                    logger.info(
-                        "execute 返回空内容,但第 %d 次 history 轮询获取到回复 (等待 %.0fs)",
-                        poll, poll * poll_interval,
-                    )
-                    return text
-                logger.debug(
-                    "history_fallback 第 %d/%d 次轮询,暂无新回复",
-                    poll, max_polls,
-                )
-            return None
-
-        for attempt in range(1, max_attempts + 1):
-            before_history = await fetch_history()
-            try:
-                result = await agent.execute(query_text, options=options)
-                if result is None:
-                    raise RuntimeError("Agent returned None")
-
-                if getattr(result, "content", None):
-                    return result, False
-
-                fallback_text = await history_fallback(before_history)
-                if fallback_text:
-                    return result.model_copy(
-                        update={
-                            "success": True,
-                            "content": fallback_text,
-                            "stop_reason": result.stop_reason or "complete",
-                            "error_message": None,
-                        }
-                    ), True
-
-                error_message = getattr(result, "error_message", None)
-                if error_message and not str(error_message).startswith(
-                    "Agent completed with no response"
-                ):
-                    raise RuntimeError(error_message)
-
-                raise RuntimeError(
-                    "Agent returned empty content and chat.history had no new assistant reply"
-                )
-            except (GatewayError, asyncio.TimeoutError) as e:
-                logger.warning(
-                    "gateway 连接异常 (第 %d/%d 次): %s，先查 history 看旧 run 是否已完成",
-                    attempt, max_attempts, e,
-                )
-                gw = client.gateway
-                if hasattr(gw, "ensure_connected"):
-                    try:
-                        await gw.ensure_connected(timeout=DEFAULT_GATEWAY_TIMEOUT_SECONDS)
-                        logger.info("gateway 重连恢复")
-                    except GatewayError:
-                        logger.warning("gateway 重连未恢复")
-
-                fallback_text = await history_fallback(before_history)
-                if fallback_text:
-                    logger.info("WS 断开但 agent 已完成,从 history 获取到回复")
-                    return ExecutionResult(
-                        success=True,
-                        content=fallback_text,
-                        stop_reason="complete",
-                    ), True
-
-                if attempt >= max_attempts:
-                    raise
-                logger.warning(
-                    "history 也无结果,第 %d/%d 次重试前等待 %d 秒",
-                    attempt, max_attempts, EXECUTION_RETRY_WAIT_SECONDS,
-                )
-                await asyncio.sleep(EXECUTION_RETRY_WAIT_SECONDS)
-                continue
-            except RuntimeError as e:
-                if attempt >= max_attempts:
-                    logger.error("agent 连续返回空内容 %d 次: %s", attempt, e)
-                    raise
-                logger.warning(
-                    "agent 返回空内容且 history 无兜底,第 %d/%d 次重试前等待 %d 秒: %s",
-                    attempt, max_attempts, EXECUTION_RETRY_WAIT_SECONDS, e,
-                )
-                await asyncio.sleep(EXECUTION_RETRY_WAIT_SECONDS)
+            logger.warning("harness readyz 未就绪: %s", status.detail)
 
     # simulator 按逻辑 session_name 隔离记忆:同会话复用实例、跨会话互不可见
     simulators: Dict[str, User_simulator] = {}
@@ -916,7 +752,6 @@ async def execute_queries(
         logger.info("[Q] %s", query.text)
 
         query_text = _replace_variables(query.text, results)
-        options = ExecutionOptions(timeout_seconds=query.timeout) if query.timeout else None
         base_session = query.session_name or "main"
         session_name = f"{base_session}_{_RUN_ID}"
 
@@ -955,7 +790,7 @@ async def execute_queries(
         # is_noise 时强制不建 evaluator(噪声 query 不评估)
         evaluator = (
             None if query.is_noise
-            else create_evaluator(query.evaluate, client, _RUN_ID, base_session, eval_sys_prompt)
+            else create_evaluator(query.evaluate, adapter, _RUN_ID, base_session, eval_sys_prompt)
         )
 
         # 文件隔离:被测 agent 执行前,把本 query 的 oracle/rubrics 从磁盘删除(内容已在内存)。
@@ -965,14 +800,16 @@ async def execute_queries(
 
         for turn in range(1, max_turn + 1 if query_simulator else 2):
             logger.debug("[Q%d] %s", turn, current_query)
-            agent = client.get_agent(query.agent_name, session_name)
 
             # 能力1:采集本轮工具证据基线(发送前的会话历史),供本轮结束后做增量解析
-            before_history = await _safe_chat_history(agent)
+            # (缺 HISTORY_FALLBACK 能力时返回空,本轮 tool_calls 改由 TurnResult 直接携带)
+            before_history = await _safe_fetch_history(adapter, query.agent_name, session_name)
 
             try:
-                result, evidence_incomplete = await execute_with_retry(
-                    agent, current_query, options
+                # adapter.execute 内部消化空响应/history 兜底/重连,返回中立 TurnResult
+                # (evidence_incomplete 标记由其填充);不可恢复才抛 HarnessError。
+                result = await adapter.execute(
+                    query.agent_name, session_name, current_query, timeout=query.timeout
                 )
                 last_result = result
                 agent_reply = result.content
@@ -1001,11 +838,11 @@ async def execute_queries(
                 success = True
                 break
 
-            # 能力1+能力2:逐轮捕获带证据轨迹(含从 chat_history 解析的 tool_calls)
+            # 能力1+能力2:逐轮捕获带证据轨迹(含经 adapter.fetch_history 解析的 tool_calls)
             # + 按 eval_step 节流的第三方评估,反馈喂回 simulator
             evaluator_feedback = await process_turn(
-                client, query, turn, current_query, result, evidence_incomplete,
-                trajectory, evaluator, agent=agent, before_history=before_history,
+                adapter, query, turn, current_query, result,
+                trajectory, evaluator, session=session_name, before_history=before_history,
             )
 
             user_reply = query_simulator.chat(agent_reply, evaluator_feedback=evaluator_feedback)
@@ -1015,9 +852,7 @@ async def execute_queries(
                 logger.info("任务完成(Turn %d)", turn)
                 trajectory.outcome = "done"
                 try:
-                    await execute_with_retry(
-                        agent, "真棒", options
-                    )
+                    await adapter.execute(query.agent_name, session_name, "真棒", timeout=query.timeout)
                 except Exception:
                     pass
                 success = True
@@ -1026,9 +861,7 @@ async def execute_queries(
                 logger.error("任务失败(Turn %d):%s", turn, user_reply)
                 trajectory.outcome = "failed"
                 try:
-                    await execute_with_retry(
-                        agent, "好吧", options
-                    )
+                    await adapter.execute(query.agent_name, session_name, "好吧", timeout=query.timeout)
                 except Exception:
                     pass
                 break
@@ -1074,21 +907,19 @@ class OpenClawAutomation:
         self.config = config
         self.workspace_manager = WorkspaceManager(config.workspace_base)
 
-    async def run(self) -> Dict[str, ExecutionResult]:
-        """运行自动化流程"""
+    async def run(self) -> Dict[str, TurnResult]:
+        """运行自动化流程(经中立 `HarnessAdapter` 驱动,按 config `harness.type` 选择实现)"""
         logger.info("=" * 60)
         logger.info("OpenClaw 自动化任务系统")
         logger.info("=" * 60)
 
-        reconnect_config = {
-            "gateway_ws_url": self.config.gateway_ws_url,
-            "api_key": self.config.api_key,
-            "gateway_timeout": self.config.gateway_timeout,
-        }
-        logger.debug("reconnect_config: %s", reconnect_config)
+        # 按 harness.type 惰性构造 adapter(默认 openclaw;连接配置已折叠进 harness.connection)
+        logger.debug("harness: type=%s connection=%s",
+                     self.config.harness.type, self.config.harness.connection)
+        adapter = create_adapter(self.config.harness)
 
-        async with await build_openclaw_client(**reconnect_config) as client:
-            self.client = client
+        async with adapter:
+            self.adapter = adapter
 
             # 1. 设置工作空间
             await self._setup_workspaces()
@@ -1103,7 +934,7 @@ class OpenClawAutomation:
             }
             # 4. 执行查询(evaluator 改为 per-query 在循环内据 query.evaluate 构建)
             results = await execute_queries(
-                client,
+                adapter,
                 self.config.queries,
                 simulator_factory=simulator_factory,
                 max_turn=self.config.user_max_turn,
@@ -1158,10 +989,10 @@ class OpenClawAutomation:
         return str(p)
 
     async def _setup_agents(self) -> None:
-        """注册 Agents 到 gateway"""
+        """注册 Agents(经 adapter 供给)"""
         logger.info("设置 Agents...")
 
-        agent_manager = AgentManager(self.client, self.workspace_manager)
+        agent_manager = AgentManager(self.adapter, self.workspace_manager)
 
         for agent_config in self.config.agents:
             await agent_manager.setup_agent(agent_config)
@@ -1225,22 +1056,23 @@ def _resolve_evaluate_refs(config: "AutomationConfig", config_dir: Path) -> None
             op = (config_dir / ev.oracle_ref)
             if not op.exists():
                 raise FileNotFoundError(f"evaluate.oracle_ref 不存在: {op}")
-            oracle_text = op.read_text(encoding="utf-8")
-            ev.oracle_data = json.loads(oracle_text)
+            oracle_bytes = op.read_bytes()
+            # utf-8-sig 容 BOM;json.loads 不容 BOM,故解码后再 parse
+            ev.oracle_data = json.loads(oracle_bytes.decode("utf-8-sig"))
             # 留存原始字节+绝对路径,供执行期隔离/还原(整文件粒度,逐字节回写)
-            ev.file_vault[str(op.resolve())] = oracle_text
+            ev.file_vault[str(op.resolve())] = oracle_bytes
 
         if ev.rubrics_ref:
             file_part, _, ptr = ev.rubrics_ref.partition("#")
             rp = (config_dir / file_part)
             if not rp.exists():
                 raise FileNotFoundError(f"evaluate.rubrics_ref 不存在: {rp}")
-            rubrics_text = rp.read_text(encoding="utf-8")
-            raw = json.loads(rubrics_text)
+            rubrics_bytes = rp.read_bytes()
+            raw = json.loads(rubrics_bytes.decode("utf-8-sig"))
             arr = _resolve_json_pointer(raw, ptr) if ptr else raw
             ev.structured_rubrics = [Rubric.from_raw(r, i) for i, r in enumerate(arr, 1)]
-            # 片段引用也按整文件留存(删除/还原以整文件为单位)
-            ev.file_vault[str(rp.resolve())] = rubrics_text
+            # 片段引用也按整文件留存(删除/还原以整文件为单位,逐字节)
+            ev.file_vault[str(rp.resolve())] = rubrics_bytes
 
             # scoring 合成优先级(design):rubrics_ref 指向的 evaluate 块为权威源(含完整 bucket_map),
             # q1.json 内联 scoring 作覆盖/兜底。仅当内联缺 bucket_map 时才去权威源补。
@@ -1274,7 +1106,8 @@ class ConfigLoader:
         if not path.exists():
             raise FileNotFoundError(f"配置文件不存在: {file_path}")
 
-        content = path.read_text(encoding="utf-8")
+        # utf-8-sig:对带/不带 BOM 的 UTF-8 都正确解码(部分编辑器保存的 config 带 BOM)
+        content = path.read_text(encoding="utf-8-sig")
 
         # 尝试解析 JSON
         if path.suffix.lower() in ['.json']:

@@ -1,12 +1,15 @@
 """逐轮轨迹证据捕获(能力: trajectory-capture)。
 
 在多轮对话执行中,为每个 turn 留存 agent 的可核验证据:
-- `tool_calls`(由调用方从 OC `chat_history` 解析后传入;SDK 的 `ExecutionResult.tool_calls` 对服务端自主 agent 恒空)
-- 生成文件(以 `agents.files.get(被测 agentId)` 读取的**磁盘真相**为准,而非采信
-  `ExecutionResult.files` 自报)
+- `tool_calls`(由调用方经 `adapter.fetch_history` 取数后用 `extract_tool_calls` 解析传入;
+  harness 原生 `TurnResult.tool_calls` 对服务端自主 agent 恒空)
+- 生成文件(以 `adapter.read_workspace/get_file(被测 agent)` 读取的**磁盘真相**为准,
+  而非采信 `TurnResult.files` 自报)
 并标注证据完整性:经 `history_fallback` 兜底、只剩文本的 turn 标 `evidence_incomplete`。
 
-本模块不依赖 openclaw_automation,避免循环导入。
+本模块只依赖中立 `harness` 接口与类型,不直接 import 任何具体 harness SDK,也不依赖
+openclaw_automation(避免循环导入)。中立证据类型 `ToolCallEvidence`/`FileEvidence`
+收敛于 `harness.types`,本模块重导出以保持既有 import 不破。
 """
 
 from __future__ import annotations
@@ -18,7 +21,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from openclaw_sdk.core.types import AgentFileContent, ExecutionResult
+from harness import Capability, HarnessAdapter
+from harness.types import FileEvidence, ToolCallEvidence, TurnResult
 
 logger = logging.getLogger("openclaw_automation")
 
@@ -31,36 +35,8 @@ SCAFFOLDING_FILES = {
 
 
 # ============================================================================
-# 证据 / 轨迹模型
+# 轨迹模型(证据类型 ToolCallEvidence/FileEvidence 自 harness.types 重导出于顶部)
 # ============================================================================
-
-class ToolCallEvidence(BaseModel):
-    """一次工具调用的证据(含入参与返回值)。
-
-    `input` 为**原生 JSON**(工具入参 dict/list 原样保留),而非转义后的 JSON 字符串——
-    使落盘轨迹里的 `tool_calls[].input` 与外层同构、可直接解析(由 `_normalize_input` 归一)。
-    非结构化入参(纯文本命令等)仍以字符串保留。
-    """
-    tool: str
-    input: Any = ""
-    output: Optional[str] = None
-    duration_ms: Optional[int] = None
-
-
-class FileEvidence(BaseModel):
-    """一个被声称生成的文件,经磁盘真相校验后的证据。
-
-    exists=True/False 表示 `agents.files.get` 在被测工作区是否真的取到该文件;
-    checked=False 表示本轮未做磁盘核验(如 evaluator 未启用),仅记录声称的文件名。
-    """
-    name: str
-    checked: bool = False
-    exists: bool = False
-    size: Optional[int] = None
-    content: Optional[str] = None
-    path: Optional[str] = None  # 产物在被测工作区的路径,供"指针投喂"(filename + workspace_path)
-    error: Optional[str] = None  # 取证失败原因(如路径不可达)→ 降级,不当负面证据
-    discovered: bool = False  # True=经工作区清点主动发现(非 agent 自报)
 
 class TurnRecord(BaseModel):
     """单个 turn 的执行记录。"""
@@ -270,14 +246,14 @@ def extract_tool_calls(messages: list[dict[str, Any]]) -> list[ToolCallEvidence]
 def build_turn_record(
     turn: int,
     user_input: str,
-    result: ExecutionResult,
+    result: TurnResult,
     evidence_incomplete: bool,
     tool_calls: Optional[list[ToolCallEvidence]] = None,
 ) -> TurnRecord:
-    """从 ExecutionResult 构建 TurnRecord(纯内存,不触网)。
+    """从中立 `TurnResult` 构建 TurnRecord(纯内存,不触网)。
 
-    tool_calls 优先取调用方从 OC `chat_history` 解析的结果(`extract_tool_calls`);
-    未提供时回退 `ExecutionResult.tool_calls`(对服务端自主 agent 恒空,仅作兼容)。
+    tool_calls 优先取调用方经 `adapter.fetch_history` + `extract_tool_calls` 解析的结果;
+    未提供时回退 `TurnResult.tool_calls`(对服务端自主 agent 恒空,仅作兼容)。
     files 仅记录声称的文件名(checked=False),磁盘真相由 `capture_file_evidence` 补齐。
     """
     if tool_calls is None:
@@ -316,7 +292,7 @@ def _read_local(path: Optional[str]) -> Optional[str]:
 
 
 async def _resolve_file_evidence(
-    gateway: Any,
+    adapter: HarnessAdapter,
     agent_id: str,
     fe: FileEvidence,
     inventory: dict[str, dict],
@@ -325,10 +301,10 @@ async def _resolve_file_evidence(
     """把单个 FileEvidence 解析为磁盘真相。
 
     取证优先级:
-    1. `agents.files.get`(可移植、可跨 agent;但本网关对用户新建文件有白名单限制);
+    1. `adapter.get_file`(可移植、可跨 agent;但本网关对用户新建文件有白名单限制);
     2. 同机按绝对路径读盘(get 读不到用户文件时的真相来源);
-    3. 网关清点的存在性(白名单可见但内容读不到时)。
-    全部受阻才降级为 error(证据缺失,不得判负);网关明确报"缺失"则权威判 exists=False
+    3. 工作区清点的存在性(白名单可见但内容读不到时)。
+    全部受阻才降级为 error(证据缺失,不得判负);adapter 明确报"缺失"则权威判 exists=False
     (用于拆穿"声称生成但磁盘无此文件")。
     """
     info = inventory.get(fe.name)
@@ -340,15 +316,14 @@ async def _resolve_file_evidence(
     get_missing = False
     get_error: Optional[str] = None
     try:
-        resp = await gateway.agents_files_get(agent_id, fe.name)
-        parsed = AgentFileContent.model_validate(resp)
+        parsed = await adapter.get_file(agent_id, fe.name)
         if not parsed.missing and parsed.content is not None:
             fe.exists = True
             fe.content = _strip_nul(parsed.content)
             return
-        get_missing = True  # 网关权威:该文件缺失
+        get_missing = True  # adapter 权威:该文件缺失
     except Exception as e:  # noqa: BLE001
-        get_error = str(e)  # get 不支持该文件 / 网关异常
+        get_error = str(e)  # get 不支持该文件 / adapter 异常
 
     # 同机读盘回退
     local_path = (info.get("path") if info else None) or (
@@ -380,38 +355,44 @@ async def _resolve_file_evidence(
 
 
 async def capture_file_evidence(
-    gateway: Any, agent_id: str, record: TurnRecord, *, discover: bool = True
+    adapter: HarnessAdapter, agent_id: str, record: TurnRecord, *, discover: bool = True
 ) -> None:
     """就地把 record.files 升级为磁盘真相,并主动清点工作区发现 agent 新建文件。
 
-    D5 落实:不采信 `ExecutionResult.files` 自报(常为空)。流程:
-    1. `agents.files.list` 取被测工作区**路径**与白名单文件清单;
+    D5 落实:不采信 `TurnResult.files` 自报(常为空)。流程:
+    1. `adapter.read_workspace` 取被测工作区**路径**与白名单文件清单;
     2. 升级 agent 自报的文件证据(get → 同机读盘 → 清点);
-    3. `discover=True` 时**直接扫描本地工作区目录**(主动去发现 agent 未自报的新文件）
+    3. `discover=True` 时**直接扫描本地工作区目录**(主动去发现 agent 未自报的新文件)。
 
-    取证受阻一律降级为证据缺失,MUST NOT 当负面证据(由下游 evaluator 规则保证)。
+    当 adapter 不具备 `FILE_EVIDENCE` 能力时,跳过磁盘核验(按"证据不完整"语义降级),
+    MUST NOT 报错中断。取证受阻一律降级为证据缺失,MUST NOT 当负面证据(由下游 evaluator 规则保证)。
     """
+    # 能力降级:缺文件证据能力 → 跳过磁盘核验,record.files 保持"仅声称"(checked=False)
+    if Capability.FILE_EVIDENCE not in getattr(adapter, "capabilities", frozenset()):
+        logger.debug("adapter 无 FILE_EVIDENCE 能力,跳过文件取证(证据不完整降级)")
+        return
+
     inventory: dict[str, dict] = {}
     workspace_path: Optional[str] = None
     if discover:
         try:
-            listing = await gateway.agents_files_list(agent_id)
-            workspace_path = listing.get("workspace")
-            for e in (listing.get("files") or []):
-                nm = e.get("name") or e.get("path") or ""
+            truth = await adapter.read_workspace(agent_id)
+            workspace_path = truth.workspace_path
+            for wf in (truth.files or []):
+                nm = wf.name or wf.path or ""
                 if not nm:
                     continue
                 inventory[nm] = {
-                    "exists": not e.get("missing", False), # OpenClaw-网关会判断对应的文件是否missing,避免虚假声称
-                    "size": e.get("size"),
-                    "path": e.get("path"),
+                    "exists": bool(wf.exists),  # adapter 会判断对应文件是否存在,避免虚假声称
+                    "size": wf.size,
+                    "path": wf.path,
                 }
         except Exception as e:  # noqa: BLE001
-            logger.debug("agents_files_list 不可用,降级为仅核验自报文件: %s", e)
+            logger.debug("read_workspace 不可用,降级为仅核验自报文件: %s", e)
 
     # 2. 升级 agent 自报的文件
     for fe in record.files:
-        await _resolve_file_evidence(gateway, agent_id, fe, inventory, workspace_path)
+        await _resolve_file_evidence(adapter, agent_id, fe, inventory, workspace_path)
 
     # 3. 直接扫描本地工作区目录,发现用户新建产物(网关 list 受白名单限制看不到)
     if discover and workspace_path:
