@@ -35,9 +35,14 @@ SCAFFOLDING_FILES = {
 # ============================================================================
 
 class ToolCallEvidence(BaseModel):
-    """一次工具调用的证据(含入参与返回值)。"""
+    """一次工具调用的证据(含入参与返回值)。
+
+    `input` 为**原生 JSON**(工具入参 dict/list 原样保留),而非转义后的 JSON 字符串——
+    使落盘轨迹里的 `tool_calls[].input` 与外层同构、可直接解析(由 `_normalize_input` 归一)。
+    非结构化入参(纯文本命令等)仍以字符串保留。
+    """
     tool: str
-    input: str = ""
+    input: Any = ""
     output: Optional[str] = None
     duration_ms: Optional[int] = None
 
@@ -122,7 +127,7 @@ def _render_turn(t: TurnRecord) -> str:
         lines.append("[工具调用]:")
         for tc in t.tool_calls:
             out = (tc.output or "")[:2000]
-            lines.append(f"  - {tc.tool}(input={tc.input[:500]}) -> {out}")
+            lines.append(f"  - {tc.tool}(input={_fmt_input(tc.input, 500)}) -> {out}")
     if t.files:
         lines.append("[文件证据(磁盘真相)]:")
         for f in t.files:
@@ -155,7 +160,7 @@ def _render_turn_compact(t: TurnRecord) -> str:
         lines.append("[工具调用]:")
         for tc in t.tool_calls:
             out = (tc.output or "")[:800]
-            lines.append(f"  - {tc.tool}(input={tc.input[:300]}) -> {out}")
+            lines.append(f"  - {tc.tool}(input={_fmt_input(tc.input, 300)}) -> {out}")
     if t.files:
         # 仅列出本轮涉及的产物名(指针清单另行统一给出),不贴内容
         names = ", ".join(f.name for f in t.files)
@@ -170,6 +175,34 @@ def _render_turn_compact(t: TurnRecord) -> str:
 # ============================================================================
 # 捕获辅助
 # ============================================================================
+
+def _normalize_input(args: Any) -> Any:
+    """把工具入参归一为**原生 JSON**:
+
+    - dict/list:原样保留(落盘即为嵌套 JSON,不再 `json.dumps` 成转义字符串);
+    - 形如 JSON 的字符串(以 `{`/`[` 开头):尝试 `json.loads` 解析回对象,失败则保留原字符串;
+    - 其余(纯文本命令、数字等):原值返回;None → 空字符串。
+    """
+    if args is None:
+        return ""
+    if isinstance(args, (dict, list)):
+        return args
+    if isinstance(args, str):
+        s = args.strip()
+        if s and s[0] in "{[":
+            try:
+                return json.loads(s)
+            except (ValueError, TypeError):
+                return args
+        return args
+    return args
+
+
+def _fmt_input(val: Any, limit: int) -> str:
+    """把 `input`(原生 JSON 或字符串)渲染为带长度上限的字符串,供轨迹文本预览。"""
+    s = val if isinstance(val, str) else json.dumps(val, ensure_ascii=False)
+    return s[:limit]
+
 
 def _block_text(content: Any) -> str:
     """把 OC 消息的 content(块数组或字符串)拍平为纯文本。"""
@@ -211,19 +244,14 @@ def extract_tool_calls(messages: list[dict[str, Any]]) -> list[ToolCallEvidence]
                 continue
             cid = block.get("id")
             name = block.get("name") or block.get("toolName") or ""
-            args = block.get("arguments")
-            input_str = (
-                json.dumps(args, ensure_ascii=False)
-                if isinstance(args, (dict, list))
-                else ("" if args is None else str(args))
-            )
+            input_val = _normalize_input(block.get("arguments"))
             output: Optional[str] = None
             res = results_by_id.get(cid) if cid else None
             if res is not None:
                 output = _block_text(res.get("content"))
                 if res.get("isError"):
                     output = f"[error] {output}"
-            calls.append(ToolCallEvidence(tool=name, input=input_str, output=output))
+            calls.append(ToolCallEvidence(tool=name, input=input_val, output=output))
     return calls
 
 
@@ -244,7 +272,7 @@ def build_turn_record(
         tool_calls = [
             ToolCallEvidence(
                 tool=tc.tool,
-                input=tc.input,
+                input=_normalize_input(tc.input),
                 output=tc.output,
                 duration_ms=tc.duration_ms,
             )
