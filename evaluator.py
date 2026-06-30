@@ -380,11 +380,6 @@ class Evaluator:
         # D1:评估前 reset 会话,确保自身上一轮判词不被回放(防锚定)
         await self._reset_session(eval_agent)
 
-        # 投递(b):把磁盘真相文件推进 evaluator 自己的工作区,供其用工具就地核验
-        # (reset 清的是对话,不动工作区,故顺序 reset → push → send 安全)
-        # OpenClaw 的设计中，每个 Agent 的工具只能访问自己的工作区，无法跨界读取其他 Agent 的文件
-        await self._push_review_files(current_turn)
-
         # 投递(a):origin_query + rubrics + 最近 window 轮 + 产物指针(不投全量历史/不投自身旧判词)
         prompt = self._build_prompt(trajectory, rubric, window)
         prompt_chars = len(prompt)  # token 代理量,供 eval_step 实验对比开销

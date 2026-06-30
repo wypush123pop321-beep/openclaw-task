@@ -204,14 +204,26 @@ def _fmt_input(val: Any, limit: int) -> str:
     return s[:limit]
 
 
+def _strip_nul(s: Optional[str]) -> Optional[str]:
+    """剥离空字节 `\\x00`(U+0000)。
+
+    二进制产物(如 .xlsx)的工具返回/文件内容可能混入原始 NUL,而它属合法
+    UTF-8,`errors="replace"` 不会过滤;若随证据流入评估 prompt,会被模型网关
+    以 "message must not contain null bytes" 拒收。统一在采集咽喉点剥离。
+    """
+    return s.replace("\x00", "") if s else s
+
+
 def _block_text(content: Any) -> str:
-    """把 OC 消息的 content(块数组或字符串)拍平为纯文本。"""
+    """把 OC 消息的 content(块数组或字符串)拍平为纯文本(并剥离 NUL)。"""
     if isinstance(content, str):
-        return content
-    if isinstance(content, list):
+        text = content
+    elif isinstance(content, list):
         parts = [b["text"] for b in content if isinstance(b, dict) and isinstance(b.get("text"), str)]
-        return "".join(parts)
-    return "" if content is None else str(content)
+        text = "".join(parts)
+    else:
+        text = "" if content is None else str(content)
+    return _strip_nul(text)
 
 
 def extract_tool_calls(messages: list[dict[str, Any]]) -> list[ToolCallEvidence]:
@@ -297,7 +309,7 @@ def _read_local(path: Optional[str]) -> Optional[str]:
     try:
         p = Path(path)
         if p.is_file():
-            return p.read_text(encoding="utf-8", errors="replace")
+            return _strip_nul(p.read_text(encoding="utf-8", errors="replace"))
     except Exception as e:  # noqa: BLE001
         logger.debug("本地读盘失败 %s: %s", path, e)
     return None
@@ -332,7 +344,7 @@ async def _resolve_file_evidence(
         parsed = AgentFileContent.model_validate(resp)
         if not parsed.missing and parsed.content is not None:
             fe.exists = True
-            fe.content = parsed.content
+            fe.content = _strip_nul(parsed.content)
             return
         get_missing = True  # 网关权威:该文件缺失
     except Exception as e:  # noqa: BLE001

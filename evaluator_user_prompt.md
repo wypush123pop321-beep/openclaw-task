@@ -18,7 +18,7 @@
 
 <!-- @section generated_files -->
 # 产物文件(指针·累积)
-以下产物已推进到你工作区的 `{review_subdir}/` 下,请用你自己的工具打开/检索/核验其内容,MUST NOT 凭文件名臆断:
+请用你自己的工具打开/检索/核验以下产物,MUST NOT 凭文件名臆断:
 {generated_file_lines}
 
 <!-- @section oracle -->

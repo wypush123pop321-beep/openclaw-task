@@ -1,4 +1,4 @@
-{
+﻿{
   "_comment": "AutomationConfig(generate_configs.py 口径)。真实文件环境：三份《数据安全事件报告规范》规范放在 D/合规/ 真实文件树，MAP_Windows.json 为文件系统映射，env_config.json 为机器快照；query 带一句口语 noise 开场（任务加噪组）。solver 需用文件/代码工具读真实 .md。evaluator 已在轨迹管线里；这里只按名字引用。",
   "system": {
     "platform": [
@@ -8,7 +8,7 @@
     "tools": []
   },
   "input_dir": {
-    "skill_dir": "skill_localize/skills_library",
+    "skill_dir": "skills/skill_localize/skills_library",
     "agent_dir": "agents",
     "user_dir": {
       "path": "configs/01_基础信息获取_task2_时效冲突检测",
@@ -45,7 +45,7 @@
       "timeout": 3600,
       "evaluate": {
         "evaluator_agent": "evaluator",
-        "evaluate_every_n_turns": 2,
+        "evaluate_every_n_turns": 1,
         "feedback_to_user": true,
         "oracle_ref": "oracle.json",
         "rubrics_ref": "user_queries.json#/0/evaluate/0/custom_rubrics",

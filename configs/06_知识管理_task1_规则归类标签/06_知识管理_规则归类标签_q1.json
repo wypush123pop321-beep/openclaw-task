@@ -1,4 +1,4 @@
-{
+﻿{
   "_comment": "AutomationConfig·真实文件环境(UserSimulator batch_generate 产出的真实用户电脑文件)。D/ 为真实文件树(笔记库/待归类笔记.md、笔记库/分类规则.md),MAP_Windows.json 为文件系统映射,env_config.json 为机器快照。solver 需用文件/代码工具读真实 .md 文件并按规则归类。oracle 由 python 按规则精算。",
   "system": {
     "platform": [
@@ -8,7 +8,7 @@
     "tools": []
   },
   "input_dir": {
-    "skill_dir": "skill_localize/skills_library",
+    "skill_dir": "skills/skill_localize/skills_library",
     "agent_dir": "agents",
     "user_dir": {
       "path": "configs/06_知识管理_task1_规则归类标签",
@@ -45,7 +45,7 @@
       "timeout": 3600,
       "evaluate": {
         "evaluator_agent": "evaluator",
-        "evaluate_every_n_turns": 2,
+        "evaluate_every_n_turns": 1,
         "feedback_to_user": true,
         "oracle_ref": "oracle.json",
         "rubrics_ref": "user_queries.json#/0/evaluate/0/custom_rubrics",

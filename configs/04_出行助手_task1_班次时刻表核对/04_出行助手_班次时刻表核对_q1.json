@@ -8,7 +8,7 @@
     "tools": []
   },
   "input_dir": {
-    "skill_dir": "skill_localize/skills_library",
+    "skill_dir": "skills/skill_localize/skills_library",
     "agent_dir": "agents",
     "user_dir": {
       "path": "configs/04_出行助手_task1_班次时刻表核对",
