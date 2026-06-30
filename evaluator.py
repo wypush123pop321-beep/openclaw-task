@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
@@ -244,6 +246,8 @@ class EvaluationResult(BaseModel):
     gate_status: dict = Field(default_factory=dict, description="各 gate 项 0/1 状态(Scorer 算出)")
 
 
+# 内置默认评估提示词(evaluator 的角色/铁律/工作区纪律)。写死在此处;
+# query 的 evaluator agent 若另配了 system_prompt,会在 Evaluator 处覆盖本默认值。
 DEFAULT_EVAL_PROMPT = """你是一个独立、严格的任务评估专家(Evaluator),独立于对话中的"用户"和"执行 agent"。
 你的职责:基于**可核验证据**(工具调用记录、磁盘上的真实文件)判断执行 agent 本轮的表现,而非轻信其文本说辞。
 
@@ -258,8 +262,42 @@ DEFAULT_EVAL_PROMPT = """你是一个独立、严格的任务评估专家(Evalua
 - 标注为"证据不完整(evidence_incomplete)/核验受阻"的项,MUST NOT 当作负面证据判 agent 未达成(避免冤枉 harness 掉线)。
 - 每条关键判断都要在 citations 里引用轨迹中的**具体语句、工具返回或文件内容**作为依据。
 
+工作区纪律(评估期间 MUST 严守):
+- **禁止新增/创建任何文件**——核验时不得在你的工作区生成临时文件、脚本或任何中间产物。
+- 若确因核验需要(如运行脚本)而产生了任何文件,**核验完成后一律删除**,确保评估结束时你的工作区不残留任何由你新生成的文件。
+- 本纪律仅约束你(evaluator)自身的产物行为,不影响你对被测 agent 已有产物文件的读取与裁定。
+
 输出 inclination:任务确已达成→accept;尚有缺口/有矛盾→reject;证据不足以判定→uncertain。
 """
+
+# 每轮投喂的 user 消息模板:外置到 evaluator_user_prompt.md,按 `<!-- @section NAME -->`
+# 切成命名片段(skeleton/generated_files/oracle/rubric/no_rubric),由 _build_prompt 选片段+replace 装配。
+_USER_PROMPT_FILE = Path(__file__).parent / "evaluator_user_prompt.md"
+_SECTION_MARKER = re.compile(r"\s*<!--\s*@section\s+(\w+)\s*-->\s*$")
+
+
+def _load_prompt_sections(path: Path) -> Dict[str, str]:
+    """把 user 提示词模板按 `<!-- @section NAME -->` 标记切成 {name: 片段文本}。
+
+    标记行之前的内容(文件头注释)被忽略;每个片段去除首尾空行。
+    """
+    sections: Dict[str, str] = {}
+    name: Optional[str] = None
+    buf: List[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        m = _SECTION_MARKER.match(line)
+        if m:
+            if name is not None:
+                sections[name] = "\n".join(buf).strip("\n")
+            name, buf = m.group(1), []
+        elif name is not None:
+            buf.append(line)
+    if name is not None:
+        sections[name] = "\n".join(buf).strip("\n")
+    return sections
+
+
+_SECTIONS = _load_prompt_sections(_USER_PROMPT_FILE)
 
 
 # ============================================================================
@@ -456,62 +494,58 @@ class Evaluator:
 
         刻意**不投**全量历史、**不投**文件全文、**不投** evaluator 自身上一轮判词(防锚定)。
         进步感知由窗口内 window 轮的证据变化体现。
+
+        文案全部外置到 evaluator_user_prompt.md(_SECTIONS);本方法只做「算占位符值 +
+        选片段(无则置空串)+ 一条 replace 链」,不内联成段提示词。
         """
-        parts = [
-            self._prompt_template,
-            f"\n# 原始任务(Origin_query)\n{trajectory.query}",
-            f"\n# 最近 {window} 轮执行证据(含工具调用)\n{trajectory.render_recent(window)}",
-        ]
-        pointers = trajectory.generated_file_pointers()
-        if pointers:
-            ptr_lines = "\n".join(
-                f"- {p['filename']} (workspace_path={p['workspace_path']})" for p in pointers
+        # 产物文件片段:无产物→空串;有则前置空行与正文隔开。
+        file_pointers = trajectory.generated_file_pointers()
+        if file_pointers:
+            generated_file_lines = "\n".join(
+                f"- {p['filename']} (workspace_path={p['workspace_path']})" for p in file_pointers
             )
-            parts.append(
-                f"\n# 产物文件(指针·累积)\n"
-                f"以下产物已推进到你工作区的 `{self.config.review_subdir}/` 下,"
-                "请用你自己的工具打开/检索/核验其内容,MUST NOT 凭文件名臆断:\n"
-                f"{ptr_lines}"
+            generated_files_section = "\n\n" + (
+                _SECTIONS["generated_files"]
+                .replace("{review_subdir}", self.config.review_subdir)
+                .replace("{generated_file_lines}", generated_file_lines)
             )
+        else:
+            generated_files_section = ""
+
+        # rubric 片段:有→(可选 Oracle 子片段)+ 逐条清单 JSON;无→无清单声明。
         if rubric:
-            # 投喂 Oracle ground-truth(供 oracle_cmp/program 类据 formula 与 gt_ref 精确比对)
+            # Oracle ground-truth(供 oracle_cmp/program 类据 formula 与 gt_ref 精确比对);无则空串。
             oracle = getattr(self.config, "oracle_data", None)
-            if oracle:
-                parts.append(
-                    "\n# Ground-Truth(Oracle)\n"
-                    "以下为本任务的标准答案。`oracle_cmp`/`program` 类准则 MUST 据其对应 `gt_ref` 字段做精确比对:\n"
-                    f"```json\n{json.dumps(oracle, ensure_ascii=False, indent=2)}\n```"
-                )
-            # 统一以 JSON 投喂(与上面 Oracle 块同构),不再做文本扁平化转换:
-            # 保留 rubric 的原始结构(id/when/evaluator/text/formula/gt_ref),供 agent 精确解析。
+            oracle_section = (
+                _SECTIONS["oracle"].replace(
+                    "{oracle_json}", json.dumps(oracle, ensure_ascii=False, indent=2)
+                ) + "\n\n"
+            ) if oracle else ""
+            # 统一以 JSON 投喂(与 Oracle 块同构),保留 rubric 原始结构供 agent 精确解析。
             criteria = json.dumps(
                 [r.model_dump(exclude_none=True) for r in rubric],
                 ensure_ascii=False, indent=2,
             )
-            parts.append(
-                "\n# 验收清单(Rubric · 逐条 0/1 判定)\n"
-                "以下是本任务的固定验收准则(JSON 数组)。你 MUST 对**每一条**基于可核验证据(工具记录/磁盘真相/上面的 Oracle)逐条裁定,"
-                "把结果写入结构化输出的 `rubric_checks`,每条含 `rubric_id`(照抄下面的 id)、`criterion`、"
-                "`passed`(1=通过 / 0=不通过)、`evidence`:\n"
-                f"```json\n{criteria}\n```\n"
-                "判定规则:\n"
-                "- `program`/`oracle_cmp` 类:严格据 `formula` 与 Oracle 的 `gt_ref` 字段做精确比对,得 1 或 0。\n"
-                "- 核验受阻(证据缺失/文件读不到)一律判 `passed=0`,MUST NOT 输出任何中间态。\n"
-                "- 每条都要在 `evidence` 里引用本轮证据中的具体依据。\n"
-                "注意:`completion` 取值域为 0~1(非百分制),且你给出的整体 `completion` 数值将被系统按权重公式覆盖——你只需保证每条 0/1 判定准确。"
+            rubric_section = (
+                _SECTIONS["rubric"]
+                .replace("{oracle_section}", oracle_section)
+                .replace("{criteria}", criteria)
             )
         else:
-            # 无冻结 rubric:显式声明 rubric_checks 必须为空,避免模型把评估维度当准则自拟
-            parts.append(
-                "\n# 验收清单(Rubric)\n"
-                "本任务**没有**验收清单。你 MUST 让结构化输出的 `rubric_checks` 返回空数组 `[]`,"
-                "MUST NOT 自拟任何 rubric 准则,也 MUST NOT 把上面的评估维度当作 rubric 准则填入 `rubric_checks`。"
-            )
-        parts.append(
-            "\n# 你的任务\n请基于以上证据评估执行 agent 的当前表现(以最近 "
-            f"{window} 轮证据 + 产物指针为准),输出结构化裁决。"
+            # 无冻结 rubric:显式声明 rubric_checks 必须为空,避免模型把评估维度当准则自拟。
+            rubric_section = _SECTIONS["no_rubric"]
+
+        # 一条 replace 链:结构占位符与已构造好的片段先填,自由文本(可能偶含 `{…}` 字面)最后填,
+        # 避免被二次替换(同 user_simulator._render 的既有取舍)。
+        return (
+            _SECTIONS["skeleton"]
+            .replace("{window}", str(window))
+            .replace("{generated_files_section}", generated_files_section)
+            .replace("{rubric_section}", rubric_section)
+            .replace("{system_prompt}", self._prompt_template)
+            .replace("{origin_query}", trajectory.query)
+            .replace("{recent_evidence}", trajectory.render_recent(window))
         )
-        return "\n".join(parts)
 
     def _log(
         self,

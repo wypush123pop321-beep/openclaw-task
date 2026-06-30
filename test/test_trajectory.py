@@ -147,7 +147,8 @@ def test_extract_tool_calls_from_history():
     calls = extract_tool_calls(messages)
     assert len(calls) == 2, f"应解析出 2 次工具调用,实得 {len(calls)}"
     assert calls[0].tool == "write"
-    assert "probe.txt" in calls[0].input and "hello-probe" in calls[0].input
+    # input 为原生 JSON 对象(非转义字符串):入参 dict 原样保留
+    assert calls[0].input == {"file_path": "probe.txt", "content": "hello-probe"}
     assert calls[0].output == "Successfully wrote 11 bytes to probe.txt"
     assert calls[1].tool == "read" and calls[1].output == "hello-probe"
     print("✓ 从 chat_history 解析 toolCall/toolResult 并按 id 配对")
