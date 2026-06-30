@@ -1,4 +1,4 @@
-[
+﻿[
   {
     "topic": "前端组件·fixture渲染·并列排行榜",
     "system_type": "windows",
@@ -28,7 +28,7 @@
     "evaluate": [
       {
         "evaluator_agent": "evaluator",
-        "evaluate_every_n_turns": 2,
+        "evaluate_every_n_turns": 1,
         "feedback_to_user": true,
         "oracle_ref": "oracle.json",
         "custom_rubrics": [

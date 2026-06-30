@@ -1,4 +1,4 @@
-[
+﻿[
   {
     "topic": "出行规划·班次时刻表核对·约束过滤",
     "system_type": "windows",
@@ -29,7 +29,7 @@
     "evaluate": [
       {
         "evaluator_agent": "evaluator",
-        "evaluate_every_n_turns": 2,
+        "evaluate_every_n_turns": 1,
         "feedback_to_user": true,
         "oracle_ref": "oracle.json",
         "custom_rubrics": [

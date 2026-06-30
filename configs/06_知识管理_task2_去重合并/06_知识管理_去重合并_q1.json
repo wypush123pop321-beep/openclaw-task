@@ -1,4 +1,4 @@
-{
+﻿{
   "_comment": "AutomationConfig·真实文件环境。D/ 为真实文件树(笔记库),MAP_Windows.json 为文件系统映射,env_config.json 为机器快照。solver 需用文件/代码工具读真实 .md。含 noise 前缀(前置口语干扰)。",
   "system": {
     "platform": [
@@ -8,7 +8,7 @@
     "tools": []
   },
   "input_dir": {
-    "skill_dir": "skill_localize/skills_library",
+    "skill_dir": "skills/skill_localize/skills_library",
     "agent_dir": "agents",
     "user_dir": {
       "path": "configs/06_知识管理_task2_去重合并",
@@ -45,7 +45,7 @@
       "timeout": 3600,
       "evaluate": {
         "evaluator_agent": "evaluator",
-        "evaluate_every_n_turns": 2,
+        "evaluate_every_n_turns": 1,
         "feedback_to_user": true,
         "oracle_ref": "oracle.json",
         "rubrics_ref": "user_queries.json#/0/evaluate/0/custom_rubrics",

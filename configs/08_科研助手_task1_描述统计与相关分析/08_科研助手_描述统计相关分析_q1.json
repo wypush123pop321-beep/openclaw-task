@@ -8,7 +8,7 @@
     "tools": []
   },
   "input_dir": {
-    "skill_dir": "skill_localize/skills_library",
+    "skill_dir": "skills/skill_localize/skills_library",
     "agent_dir": "agents",
     "user_dir": {
       "path": "configs/08_科研助手_task1_描述统计与相关分析",
@@ -45,7 +45,7 @@
       "timeout": 3600,
       "evaluate": {
         "evaluator_agent": "evaluator",
-        "evaluate_every_n_turns": 2,
+        "evaluate_every_n_turns": 1,
         "feedback_to_user": true,
         "oracle_ref": "oracle.json",
         "rubrics_ref": "user_queries.json#/0/evaluate/0/custom_rubrics",

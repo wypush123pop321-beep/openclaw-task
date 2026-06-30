@@ -1,4 +1,4 @@
-[
+﻿[
   {
     "topic": "知识管理·论文笔记去重·合并日志输出",
     "system_type": "windows",
@@ -28,7 +28,7 @@
     "evaluate": [
       {
         "evaluator_agent": "evaluator",
-        "evaluate_every_n_turns": 2,
+        "evaluate_every_n_turns": 1,
         "feedback_to_user": true,
         "oracle_ref": "oracle.json",
         "custom_rubrics": [
