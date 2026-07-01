@@ -1,0 +1,47 @@
+{
+  "task_id": "RA_描述统计与相关分析",
+  "as_of": "2026-06-27",
+  "mode": "real_file_env",
+  "note": "全部从真实 xlsx(20行)精算。均值与样本标准差用 ddof=1；Pearson 相关用 scipy.stats.pearsonr（双尾 p 值，t = r*sqrt((n-2)/(1-r^2))，df=n-2=18）。",
+  "method": "numpy mean/std(ddof=1) + scipy.stats.pearsonr; two-tailed p via t-distribution df=18; alpha=0.05",
+  "real_facts": {
+    "data_n": 20,
+    "columns": [
+      "id",
+      "edu_years",
+      "work_exp",
+      "monthly_wage"
+    ]
+  },
+  "derived": {
+    "mean_edu": 15.1,
+    "std_edu": 3.2265,
+    "mean_exp": 5.15,
+    "std_exp": 3.265,
+    "mean_wage": 8060.0,
+    "std_wage": 3250.8137,
+    "r_edu_wage": 0.9483,
+    "p_edu_wage": 2.085e-10,
+    "r_exp_wage": 0.3031,
+    "p_exp_wage": 0.193971,
+    "r_edu_exp": 0.1334,
+    "p_edu_exp": 0.575033,
+    "edu_wage_significant_at_05": true,
+    "exp_wage_significant_at_05": false,
+    "edu_exp_significant_at_05": false,
+    "significant_pairs": [
+      "edu_years~monthly_wage"
+    ],
+    "nonsignificant_pairs": [
+      "work_exp~monthly_wage",
+      "edu_years~work_exp"
+    ]
+  },
+  "provenance": [
+    {
+      "source": "D/论文数据/调研数据.xlsx",
+      "as_of": "2026-06-27",
+      "real_file": true
+    }
+  ]
+}

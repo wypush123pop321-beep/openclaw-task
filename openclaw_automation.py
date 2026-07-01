@@ -163,8 +163,19 @@ class QueryItem(BaseModel):
     session_name: Optional[str] = Field("main", description="会话名称")
     timeout: Optional[int] = Field(3600, description="超时时间(秒)")
     use_simulator: bool = Field(True, description="是否启用 user-simulator 进行多轮对话,默认 True")
-    is_noise: bool = Field(False, description="噪声/干扰 query:agent 仍执行一次,但 evaluator 与 user_simulator 均不参与(不评估、不回复、不进多轮)")
     evaluate: Optional[EvaluateConfig] = Field(None, description="第三方 evaluator 配置(query 内联块);为空则本 query 不评估。rubric/eval_step 等迁入此块")
+    # is_noise 为内部派生字段(不来自对外接口):加载后由 derive_is_noise 无条件覆盖。
+    # 语义: is_noise = (not use_simulator) and (evaluate is None) —— 无多轮、无评估 → 噪声/单发。
+    is_noise: bool = Field(False, description="[派生·勿在配置中填写]噪声/干扰 query:agent 仍执行一次,但 evaluator 与 user_simulator 均不参与")
+
+    @model_validator(mode="after")
+    def derive_is_noise(self) -> "QueryItem":
+        """据 use_simulator/evaluate 派生 is_noise,无条件覆盖任何外部输入。
+
+        对外接口已移除 is_noise;遗留配置若仍写入,以本派生值为准(平滑迁移)。
+        """
+        self.is_noise = (not self.use_simulator) and (self.evaluate is None)
+        return self
 
 
 class HarnessConfig(BaseModel):
@@ -186,6 +197,7 @@ class AutomationConfig(BaseModel):
     queries: List[QueryItem] = Field(default_factory=list)
 
     # Harness 选择 + 连接(默认 openclaw;无该段时由顶层连接字段折叠而来)
+    # 取代 align-task-config-standard 预留的占位 Harness_Type:此处为已消费的实现
     harness: Optional[HarnessConfig] = Field(None, description="harness 选择与连接;缺省时折叠顶层连接字段为 openclaw")
 
     # OpenClaw 连接配置(后向兼容:无 harness 段时折叠进 harness.connection)
@@ -1044,8 +1056,9 @@ def _resolve_evaluate_refs(config: "AutomationConfig", config_dir: Path) -> None
     """解引用各 query 的 evaluate 块外部引用,以 config 文件所在目录为相对基准。
 
     - oracle_ref:加载 ground-truth → ev.oracle_data。
-    - rubrics_ref:JSON-Pointer 解引用 → ev.structured_rubrics;并按"权威源优先"合成 scoring。
-    路径缺失显式报错(不静默退空)。最后 resolve_runtime() 合成 scoring_spec。
+    - rubrics_ref:JSON-Pointer 解引用 → ev.structured_rubrics。
+    - scoring_ref:JSON-Pointer 解引用 → ev.scoring(唯一评分来源,无隐式兜底)。
+    路径/指针缺失显式报错(不静默退空)。最后 resolve_runtime() 合成 scoring_spec。
     """
     for q in config.queries:
         ev = q.evaluate
@@ -1074,20 +1087,20 @@ def _resolve_evaluate_refs(config: "AutomationConfig", config_dir: Path) -> None
             # 片段引用也按整文件留存(删除/还原以整文件为单位,逐字节)
             ev.file_vault[str(rp.resolve())] = rubrics_bytes
 
-            # scoring 合成优先级(design):rubrics_ref 指向的 evaluate 块为权威源(含完整 bucket_map),
-            # q1.json 内联 scoring 作覆盖/兜底。仅当内联缺 bucket_map 时才去权威源补。
-            if ev.scoring is None or "bucket_map" not in ev.scoring:
-                parent_ptr = ptr.rsplit("/", 1)[0] if "/" in ptr else ""
-                try:
-                    parent = _resolve_json_pointer(raw, parent_ptr) if parent_ptr else raw
-                    ref_scoring = parent.get("scoring") if isinstance(parent, dict) else None
-                except (KeyError, IndexError, ValueError):
-                    ref_scoring = None
-                if ref_scoring:
-                    merged = dict(ref_scoring)
-                    if ev.scoring:
-                        merged.update(ev.scoring)  # 内联作覆盖
-                    ev.scoring = merged
+        if ev.scoring_ref:
+            # scoring 唯一来源:显式解析 scoring_ref 指针(与 rubrics_ref 对称),无隐式兜底。
+            file_part, _, ptr = ev.scoring_ref.partition("#")
+            sp = (config_dir / file_part)
+            if not sp.exists():
+                raise FileNotFoundError(f"evaluate.scoring_ref 不存在: {sp}")
+            scoring_bytes = sp.read_bytes()
+            raw = json.loads(scoring_bytes.decode("utf-8-sig"))
+            resolved = _resolve_json_pointer(raw, ptr) if ptr else raw
+            if not isinstance(resolved, dict):
+                raise ValueError(f"evaluate.scoring_ref 未解析到 scoring 块(dict): {ev.scoring_ref}")
+            ev.scoring = resolved
+            # 整文件留存(删除/还原以整文件为单位,逐字节;与 oracle/rubrics 同构)
+            ev.file_vault[str(sp.resolve())] = scoring_bytes
 
         ev.resolve_runtime()  # 合成 scoring_spec
 

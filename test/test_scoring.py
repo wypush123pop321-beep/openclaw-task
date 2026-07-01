@@ -107,7 +107,11 @@ def test_missing_check_treated_as_zero():
 
 
 def test_empty_scoring_fallback():
-    """无 scoring(旧 config):退回单桶等权、无 gate,completion 仍可算。"""
+    """scoring 为 None(query 未配 scoring_ref):ScoringSpec 退回单桶等权、无 gate,completion 仍可算。
+
+    注:这是 ScoringSpec 层的兜底(唯一保留);_resolve_evaluate_refs 里"缺 bucket_map 回退
+    rubrics_ref 父块"的兜底已在 align-task-config-standard 中删除,scoring 只从 scoring_ref 来。
+    """
     rubrics = [Rubric.from_raw(s, i) for i, s in enumerate(["条件A", "条件B", "条件C"], 1)]
     spec = ScoringSpec.from_scoring(None, rubrics)
     scorer = Scorer(spec)
