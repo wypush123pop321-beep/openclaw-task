@@ -1,0 +1,58 @@
+{
+  "system": {
+    "platform": [
+      "windows"
+    ],
+    "python": "3.12",
+    "tools": []
+  },
+  "input_dir": {
+    "skill_dir": "skills/skill_localize/skills_library",
+    "agent_dir": "agents",
+    "user_dir": {
+      "path": "configs/task_configs_0701/0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析",
+      "profile_file": "user_profile_08_经济学硕士生_Stats.json",
+      "map_file": "MAP_Windows"
+    }
+  },
+  "agents": [
+    {
+      "name": "assistant1",
+      "config": [],
+      "skills": [],
+      "system_prompt": null,
+      "model": "glm-5.2",
+      "model_provider": "anthropic"
+    },
+    {
+      "name": "evaluator",
+      "config": [],
+      "skills": [],
+      "system_prompt": null,
+      "model": "gemini-3.5-flash",
+      "model_provider": "anthropic"
+    }
+  ],
+  "queries": [
+    {
+      "agent_name": "assistant1",
+      "text": "我D盘论文数据文件夹里有个《调研数据.xlsx》，20个受访者的受教育年限、工龄和月薪。帮我算下这三项各自的均值和样本标准差，再看看两两之间（学历跟月薪、工龄跟月薪、学历跟工龄）的相关性，哪对显著哪对不显著。结果我要写进毕业论文的，得准。",
+      "use_simulator": true,
+      "session_name": "query1",
+      "timeout": 3600,
+      "evaluate": {
+        "agent_name": "evaluator",
+        "eval_step": 1,
+        "feedback_to_simulator": true,
+        "oracle_ref": "../environments/08_科研助手_task1_描述统计与相关分析/oracle.json",
+        "rubrics_ref": "../environments/08_科研助手_task1_描述统计与相关分析/user_queries.json#/0/evaluate/0/custom_rubrics",
+        "scoring_ref": "../environments/08_科研助手_task1_描述统计与相关分析/user_queries.json#/0/evaluate/0/scoring"
+      }
+    }
+  ],
+  "gateway_ws_url": "ws://127.0.0.1:18789/gateway",
+  "api_key": null,
+  "workspace_base": "~/.openclaw/workspace",
+  "simulator_config": "configs/user_proxy_model.json",
+  "Harness_Type": null
+}

@@ -1,0 +1,22 @@
+第一轮：
+0701-任务管线与批跑管线接口对齐-修改点和检视意见梳理：
+基于configs中的任务配置示例（如 configs\08_科研助手_task1_描述统计与相关分析），进行以下修改,以满足新标准（新标准示例：0701_任务管线产物标准模板）：
+
+1. 删除is_noise字段，修改等价逻辑 is_noise = (!use_simulator AND evaluate == NULL)
+2. agents字段显示指定system_prompt，（默认配置为null)
+3. q1.json里scoring更改为scoring_ref。不再显示指定，引用到user_queries.scoring
+4. 删除role字段 -- 用于区分agent和evaluator使用不同的模型，直接用model来区分就行了。
+5. user_dir.path字段变更为：相对于运行脚本的相对路径（0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析）。
+6. q1.json要放在environments之外，统一放在task_configs目录下。
+7. oracle_ref 是否支持为NULL？ 确认一下。
+8. 增加Harness_Type字段
+
+完成上述配置后，确认：
+9. 确认custom_rubrics.evaluator（program类型）的验证形式，是否会真的调用program来验证（因为当前formula提供的是伪代码）。
+
+第二轮：
+1. 移 q1.json 到 task_configs/ 就得把 oracle_ref/rubrics_ref 改成 ../environments/…  --> 是的，这是期望的行为
+2. 把"program 不会真执行"的事实同步给相关方 --> 有什么途径能看到吗？比如能看到exec命令的tool_call吗？
+3. 可以展开，但是我建议在内部代码实现中保留isnoise字段。（只是对外接口中删除is_noise, 这样只用改一处了？） 我不知道这样好不好，拜托你分析一下。
+4. 补上正式读取 scoring_ref 的处理（当前靠隐式兜底）  --> 是的，这是期望的行为。
+5. 定义 Harness_Type 的消费者与取值范围。  --> 先不解析，作为空字段。先不做任何处理，后续特性支持。
