@@ -10,7 +10,7 @@
     "skill_dir": "skills/skill_localize/skills_library",
     "agent_dir": "agents",
     "user_dir": {
-      "path": "0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析",
+      "path": "configs/task_configs_0701/0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析",
       "profile_file": "user_profile_08_经济学硕士生_Stats.json",
       "map_file": "MAP_Windows"
     }
@@ -21,14 +21,16 @@
       "config": [],
       "skills": [],
       "system_prompt": null,
-      "model": "deepseek-v4-pro"
+      "model": "glm-5.2",
+      "model_provider": "anthropic"
     },
     {
       "name": "evaluator",
       "config": [],
       "skills": [],
       "system_prompt": null,
-      "model": "gemini-3-flash-preview"
+      "model": "gemini-3.5-flash",
+      "model_provider": "anthropic"
     }
   ],
   "queries": [
@@ -39,9 +41,9 @@
       "session_name": "query1",
       "timeout": 3600,
       "evaluate": {
-        "evaluator_agent": "evaluator",
-        "evaluate_every_n_turns": 1,
-        "feedback_to_user": true,
+        "agent_name": "evaluator",
+        "eval_step": 1,
+        "feedback_to_simulator": true,
         "oracle_ref": "../environments/08_科研助手_task1_描述统计与相关分析/oracle.json",
         "rubrics_ref": "../environments/08_科研助手_task1_描述统计与相关分析/user_queries.json#/0/evaluate/0/custom_rubrics",
         "scoring_ref": "../environments/08_科研助手_task1_描述统计与相关分析/user_queries.json#/0/evaluate/0/scoring"

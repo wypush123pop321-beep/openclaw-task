@@ -461,9 +461,17 @@ def create_evaluator(
 class AgentManager:
     """管理 Agent 的创建和注册"""
 
-    def __init__(self, client: OpenClawClient, workspace_manager: WorkspaceManager):
+    def __init__(
+        self,
+        client: OpenClawClient,
+        workspace_manager: WorkspaceManager,
+        model_whitelist: Optional[set] = None,
+    ):
         self.client = client
         self.workspace_manager = workspace_manager
+        # 网关可路由模型白名单(setup 期一次性拉取并缓存):
+        # None = 未能获取(跳过 pin 前校验,仅告警);set = 可路由模型集合(含裸名与 provider/model 两种形式)。
+        self.model_whitelist = model_whitelist
 
     async def setup_agent(self, agent_config: AgentConfigItem) -> None:
         """设置单个 Agent
@@ -512,6 +520,10 @@ class AgentManager:
         if model and "/" not in model and agent_config.model_provider:
             model = f"{agent_config.model_provider}/{model}"
 
+        # pin 前白名单校验:目标模型不可路由则失败终止,杜绝网关"写入成功({ok:True})却静默回退默认模型"。
+        # 校验须在 agents.update 之前——一旦下发不可路由模型,网关会静默回退,事后从 {ok:True} 看不出来。
+        self._assert_model_routable(agent_config.name, model)
+
         if agent_config.base_url or agent_config.api_key:
             prov = agent_config.model_provider or (model.split("/", 1)[0] if model and "/" in model else "<provider>")
             logger.info(
@@ -521,8 +533,9 @@ class AgentManager:
             )
         try:
             resp = await self.client.gateway.agents_update(agent_config.name, model=model)
+            # 注:{ok:True} 仅表示"配置串已写入",不代表模型可路由——可信性由上面的白名单校验保证。
             logger.info(
-                "已为 agent '%s' 钉死模型=%s(agents.update 返回: %s)",
+                "已为 agent '%s' 钉死模型=%s(已过白名单校验;agents.update 返回: %s)",
                 agent_config.name, model, resp,
             )
         except Exception as e:  # noqa: BLE001
@@ -530,6 +543,32 @@ class AgentManager:
                 "为 agent '%s' 下发模型=%s 失败(MUST NOT 静默退回默认): %s",
                 agent_config.name, model, e,
             )
+
+    def _assert_model_routable(self, agent_name: str, model: Optional[str]) -> None:
+        """断言目标模型在网关可路由白名单内;不在则 raise 终止装配。
+
+        白名单未获取到(None 或空集)时跳过校验并告警——避免一次 models.list 抖动
+        就把所有 pin 全部误杀;但只要白名单可用,即严格执行"不在册即报错",
+        以根治"网关静默回退默认模型"这一类静默正确性 bug。
+        """
+        wl = self.model_whitelist
+        if not wl:
+            logger.warning(
+                "未获取到网关模型白名单,跳过 agent '%s' 的 pin 前校验(model=%s)",
+                agent_name, model,
+            )
+            return
+        # 同时接受完整 'provider/model' 与裸 model 两种命中形式
+        bare = model.split("/", 1)[1] if model and "/" in model else model
+        if model in wl or bare in wl:
+            return
+        raise ValueError(
+            f"agent '{agent_name}' 目标模型 '{model}' 不在网关可路由白名单内——"
+            f"若强行下发,网关会静默回退到默认模型(本次 bug 的根因)。"
+            f"请在网关 openclaw.json 的 `models.providers.<provider>.models` 与 "
+            f"`agents.defaults.models` 登记该模型后重启网关。"
+            f"当前可路由模型: {sorted(wl)}"
+        )
 
     async def _wait_gateway_ready(self, wait: float = 90.0) -> None:
         """创建 agent 后 gateway 会重启,固定等待一段时间让其就绪。"""
@@ -1175,12 +1214,45 @@ class OpenClawAutomation:
         """注册 Agents 到 gateway"""
         logger.info("设置 Agents...")
 
-        agent_manager = AgentManager(self.client, self.workspace_manager)
+        # 白名单仅在 setup 期拉取一次并缓存,供全部 agent 的 pin 前校验复用;
+        # 不进入 per-turn/per-query 热路径(models.list 是配置层 RPC,毫秒级)。
+        model_whitelist = await self._fetch_model_whitelist()
+        agent_manager = AgentManager(self.client, self.workspace_manager, model_whitelist)
 
         for agent_config in self.config.agents:
             await agent_manager.setup_agent(agent_config)
 
         self._validate_evaluators()
+
+    async def _fetch_model_whitelist(self) -> Optional[set]:
+        """setup 期一次性拉取网关可路由模型白名单(经 models.list),缓存供 pin 前校验。
+
+        返回一个集合,同时含裸模型名与 'provider/model' 两种形式,便于两种命中匹配。
+        获取失败时返回 None(上层据此跳过校验并告警),避免一次抖动误杀全部 pin。
+        """
+        try:
+            resp = await self.client.gateway.models_list()
+        except Exception as e:  # noqa: BLE001
+            logger.error("获取网关模型白名单失败(models.list): %s;将跳过 pin 前白名单校验", e)
+            return None
+
+        models = resp.get("models", []) if isinstance(resp, dict) else []
+        wl: set = set()
+        for m in models:
+            if not isinstance(m, dict):
+                continue
+            mid = m.get("id")
+            if not mid:
+                continue
+            wl.add(mid)
+            prov = m.get("provider")
+            if prov:
+                wl.add(f"{prov}/{mid}")
+        if not wl:
+            logger.warning("网关模型白名单为空(models.list 返回未含可解析模型),将跳过 pin 前校验")
+            return None
+        logger.info("网关可路由模型白名单(%d 项): %s", len(wl), sorted(wl))
+        return wl
 
     def _validate_evaluators(self) -> None:
         """校验每个 query 的 evaluate 块:evaluator agent 须取自 agents 列表,且 ≠ 该 query 执行 agent。
