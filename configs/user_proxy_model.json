@@ -1,6 +1,6 @@
 {
-  "model": "claude-haiku-4-5-20251001",
-  "api_key": "sk-1234",
-  "base_url": "http://127.0.0.1:4000",
-  "proxy": null
+  "model": "gemini-3-flash-preview",
+  "api_key": "sk-rLrYl50px293GI08sCZqyaryUukn45lBVWyuGqc6RjZq1UPi",
+  "base_url": "https://yibuapi.com/v1",
+  "proxy": "http://10.90.91.193:3127"
 }
