@@ -1,0 +1,398 @@
+{
+  "system": {
+    "os": "Windows 10 专业版",
+    "os_version": "22H2 (19045.3803)",
+    "username": "chenmingyuan",
+    "display_name": "陈明远",
+    "hostname": "CHEN-ECON-PC",
+    "timezone": "China Standard Time (UTC+8)",
+    "language": "zh-CN",
+    "install_date": "2023-01-15",
+    "last_boot": "2024-12-19 09:12:35",
+    "product_key_partial": "XXXXX-XXXXX-XXXXX-XXXXX-W269N"
+  },
+  "hardware": {
+    "cpu": "Intel Core i5-10400 @ 2.90GHz (6C/12T)",
+    "ram_gb": 16,
+    "storage": [
+      {
+        "drive": "C:",
+        "label": "系统",
+        "type": "NVMe SSD",
+        "size_gb": 512,
+        "free_gb": 245
+      },
+      {
+        "drive": "D:",
+        "label": "科研资料",
+        "type": "SATA SSD",
+        "size_gb": 1000,
+        "free_gb": 467
+      },
+      {
+        "drive": "E:",
+        "label": "数据备份",
+        "type": "SATA HDD",
+        "size_gb": 2000,
+        "free_gb": 1523
+      }
+    ],
+    "display": "1920x1080 @75Hz AOC 24英寸 IPS",
+    "gpu": "NVIDIA GeForce GTX 1650 4GB",
+    "network_adapters": [
+      "Realtek RTL8822CE 802.11ac Wireless",
+      "Realtek PCIe GbE Family Controller"
+    ]
+  },
+  "installed_software": [
+    {
+      "name": "Anaconda3 (Python 3.12)",
+      "version": "2024.02",
+      "install_date": "2023-02-10",
+      "category": "科研计算",
+      "publisher": "Anaconda, Inc."
+    },
+    {
+      "name": "JupyterLab",
+      "version": "4.1.5",
+      "install_date": "2023-02-10",
+      "category": "科研计算",
+      "publisher": "Project Jupyter"
+    },
+    {
+      "name": "R for Windows",
+      "version": "4.3.2",
+      "install_date": "2023-02-12",
+      "category": "统计分析",
+      "publisher": "R Foundation"
+    },
+    {
+      "name": "RStudio Desktop",
+      "version": "2023.12.1",
+      "install_date": "2023-02-12",
+      "category": "统计分析",
+      "publisher": "Posit Software, PBC"
+    },
+    {
+      "name": "Stata 17",
+      "version": "17.0 MP",
+      "install_date": "2023-03-01",
+      "category": "计量经济",
+      "publisher": "StataCorp LLC"
+    },
+    {
+      "name": "Visual Studio Code",
+      "version": "1.85.2",
+      "install_date": "2023-02-11",
+      "category": "代码编辑",
+      "publisher": "Microsoft Corporation"
+    },
+    {
+      "name": "TeX Live 2023 + TeXstudio",
+      "version": "4.6.3",
+      "install_date": "2023-02-15",
+      "category": "论文排版",
+      "publisher": "TeX Users Group"
+    },
+    {
+      "name": "Zotero",
+      "version": "6.0.30",
+      "install_date": "2023-02-16",
+      "category": "文献管理",
+      "publisher": "Corporation for Digital Scholarship"
+    },
+    {
+      "name": "微信",
+      "version": "3.9.8.25",
+      "install_date": "2023-01-16",
+      "category": "通讯社交",
+      "publisher": "腾讯科技(深圳)有限公司"
+    },
+    {
+      "name": "Google Chrome",
+      "version": "120.0.6099.130",
+      "install_date": "2023-01-16",
+      "category": "网络浏览",
+      "publisher": "Google LLC"
+    },
+    {
+      "name": "腾讯QQ",
+      "version": "9.8.9.28887",
+      "install_date": "2023-01-17",
+      "category": "通讯社交",
+      "publisher": "深圳市腾讯计算机系统有限公司"
+    },
+    {
+      "name": "WPS Office 2019",
+      "version": "11.1.0.15120",
+      "install_date": "2023-01-20",
+      "category": "办公软件",
+      "publisher": "珠海金山办公软件有限公司"
+    },
+    {
+      "name": "Microsoft Office 2021",
+      "version": "16.0.14332",
+      "install_date": "2023-01-25",
+      "category": "办公软件",
+      "publisher": "Microsoft Corporation"
+    },
+    {
+      "name": "钉钉",
+      "version": "7.1.0.11",
+      "install_date": "2023-02-01",
+      "category": "办公协同",
+      "publisher": "钉钉(中国)信息技术有限公司"
+    },
+    {
+      "name": "百度网盘",
+      "version": "7.38.0.6",
+      "install_date": "2023-01-19",
+      "category": "云存储",
+      "publisher": "北京百度网讯科技有限公司"
+    },
+    {
+      "name": "坚果云",
+      "version": "6.1.3",
+      "install_date": "2023-03-08",
+      "category": "云存储",
+      "publisher": "上海亦存网络科技有限公司"
+    },
+    {
+      "name": "搜狗输入法",
+      "version": "14.3.0.9129",
+      "install_date": "2023-01-16",
+      "category": "输入法",
+      "publisher": "搜狗科技发展有限公司"
+    },
+    {
+      "name": "360安全卫士",
+      "version": "13.1.0.2008",
+      "install_date": "2023-01-16",
+      "category": "系统安全",
+      "publisher": "北京奇虎科技有限公司"
+    },
+    {
+      "name": "7-Zip",
+      "version": "23.01",
+      "install_date": "2023-01-18",
+      "category": "压缩工具",
+      "publisher": "Igor Pavlov"
+    },
+    {
+      "name": "Git for Windows",
+      "version": "2.43.0",
+      "install_date": "2023-02-11",
+      "category": "版本管理",
+      "publisher": "The Git Project"
+    },
+    {
+      "name": "MobaXterm",
+      "version": "23.6",
+      "install_date": "2023-03-20",
+      "category": "远程连接",
+      "publisher": "Mobatek"
+    },
+    {
+      "name": "Adobe Acrobat Reader DC",
+      "version": "23.008.20470",
+      "install_date": "2023-01-22",
+      "category": "文档阅读",
+      "publisher": "Adobe Inc."
+    },
+    {
+      "name": "网易有道词典",
+      "version": "9.2.40",
+      "install_date": "2023-02-20",
+      "category": "翻译词典",
+      "publisher": "网易有道信息技术(北京)有限公司"
+    },
+    {
+      "name": "QQ音乐",
+      "version": "19.85",
+      "install_date": "2023-01-18",
+      "category": "影音娱乐",
+      "publisher": "腾讯音乐娱乐科技(深圳)有限公司"
+    }
+  ],
+  "browser": {
+    "default": "Google Chrome",
+    "version": "120.0.6099.130",
+    "bookmarks": [
+      "中国知网 CNKI - cnki.net",
+      "Google Scholar - scholar.google.com",
+      "SSRN社会科学网 - ssrn.com",
+      "arXiv经济学 - arxiv.org/list/econ",
+      "PubMed - pubmed.ncbi.nlm.nih.gov",
+      "NBER工作论文 - nber.org/papers",
+      "国家统计局 - stats.gov.cn",
+      "CSMAR数据库 - csmar.com",
+      "Wind资讯 - wind.com.cn",
+      "在线统计计算器 - socscistatistics.com",
+      "GraphPad p值计算 - graphpad.com/quickcalcs",
+      "Overleaf在线LaTeX - overleaf.com",
+      "Stack Overflow - stackoverflow.com",
+      "Cross Validated统计问答 - stats.stackexchange.com",
+      "scipy文档 - docs.scipy.org",
+      "statsmodels文档 - statsmodels.org",
+      "课题组共享服务器 - 10.10.21.8",
+      "学校图书馆数据库门户 - lib.example.edu.cn",
+      "知乎 - zhihu.com",
+      "京东商城 - jd.com",
+      "淘宝网 - taobao.com",
+      "支付宝 - alipay.com",
+      "中国银行网银 - boc.cn"
+    ],
+    "extensions": [
+      "AdBlock - 广告拦截器",
+      "沙拉查词 - 聚合词典划词翻译",
+      "Zotero Connector",
+      "Tampermonkey - 油猴脚本管理器",
+      "OneTab - 标签页管理",
+      "彩云小译 - 网页翻译",
+      "Google Scholar Button"
+    ],
+    "history_summary": "学术文献与数据库(38%), 统计计算与代码问答(26%), 数据来源网站(16%), 文档协作平台(12%), 其他(8%)"
+  },
+  "recent_files": [
+    "D:\\论文数据\\调研数据.xlsx",
+    "D:\\毕业论文\\教育回报率_初稿_v3.tex",
+    "D:\\论文数据\\描述统计_分析脚本.ipynb",
+    "C:\\Users\\chenmingyuan\\Documents\\文献综述_劳动经济学.docx",
+    "D:\\毕业论文\\图表\\相关性散点图.png",
+    "D:\\论文数据\\原始问卷_受访者20份.xlsx",
+    "C:\\Users\\chenmingyuan\\Desktop\\组会汇报_12月.pptx",
+    "D:\\课程\\计量经济学\\作业4_面板回归.do",
+    "D:\\参考文献\\Mincer1974_收入方程.pdf",
+    "C:\\Users\\chenmingyuan\\Downloads\\教育回报率综述_2024.pdf"
+  ],
+  "desktop_shortcuts": [
+    "JupyterLab",
+    "RStudio",
+    "Stata 17",
+    "Visual Studio Code",
+    "TeXstudio",
+    "Zotero",
+    "Anaconda Prompt",
+    "Google Chrome",
+    "微信",
+    "WPS Office",
+    "百度网盘",
+    "坚果云",
+    "钉钉",
+    "MobaXterm",
+    "此电脑",
+    "回收站"
+  ],
+  "startup_programs": [
+    {
+      "name": "微信",
+      "path": "C:\\Program Files (x86)\\Tencent\\WeChat\\WeChat.exe",
+      "enabled": true
+    },
+    {
+      "name": "搜狗输入法",
+      "path": "C:\\Program Files (x86)\\SogouInput\\SogouCloud.exe",
+      "enabled": true
+    },
+    {
+      "name": "360安全卫士",
+      "path": "C:\\Program Files\\360\\360Safe\\safemon\\360Tray.exe",
+      "enabled": true
+    },
+    {
+      "name": "坚果云",
+      "path": "C:\\Program Files\\Nutstore\\Nutstore.exe",
+      "enabled": true
+    },
+    {
+      "name": "百度网盘",
+      "path": "C:\\Users\\chenmingyuan\\AppData\\Roaming\\BaiduYunGuanjia\\BaiduYunGuanjia.exe",
+      "enabled": false
+    },
+    {
+      "name": "NVIDIA GeForce Experience",
+      "path": "C:\\Program Files\\NVIDIA Corporation\\NVIDIA GeForce Experience\\NVIDIA GeForce Experience.exe",
+      "enabled": true
+    },
+    {
+      "name": "Realtek HD Audio Manager",
+      "path": "C:\\Program Files\\Realtek\\Audio\\HDA\\RtkNGUI64.exe",
+      "enabled": true
+    }
+  ],
+  "scheduled_tasks": [
+    {
+      "name": "论文数据增量备份",
+      "schedule": "每天 23:30",
+      "action": "将D盘科研资料增量备份到E盘",
+      "enabled": true
+    },
+    {
+      "name": "坚果云同步",
+      "schedule": "实时",
+      "action": "同步D盘毕业论文目录到云端",
+      "enabled": true
+    },
+    {
+      "name": "系统垃圾清理",
+      "schedule": "每周日 22:00",
+      "action": "运行360安全卫士清理功能",
+      "enabled": true
+    },
+    {
+      "name": "Windows更新检查",
+      "schedule": "每周三 02:00",
+      "action": "检查并安装Windows系统更新",
+      "enabled": false
+    }
+  ],
+  "network": {
+    "hostname": "CHEN-ECON-PC",
+    "ip_address": "192.168.1.125",
+    "dns": [
+      "192.168.1.1",
+      "114.114.114.114"
+    ],
+    "wifi_profiles": [
+      "经管学院-5G",
+      "经管学院-2.4G",
+      "eduroam",
+      "CHEN-Home-WiFi6",
+      "陈明远的iPhone"
+    ],
+    "proxy": {
+      "enabled": false,
+      "host": "",
+      "port": 0
+    }
+  },
+  "environment_variables": {
+    "USERPROFILE": "C:\\Users\\chenmingyuan",
+    "APPDATA": "C:\\Users\\chenmingyuan\\AppData\\Roaming",
+    "LOCALAPPDATA": "C:\\Users\\chenmingyuan\\AppData\\Local",
+    "TEMP": "C:\\Users\\chenmingyuan\\AppData\\Local\\Temp",
+    "TMP": "C:\\Users\\chenmingyuan\\AppData\\Local\\Temp",
+    "PUBLIC": "C:\\Users\\Public",
+    "PROGRAMFILES": "C:\\Program Files",
+    "PROGRAMFILES(X86)": "C:\\Program Files (x86)",
+    "COMMONPROGRAMFILES": "C:\\Program Files\\Common Files",
+    "SYSTEMROOT": "C:\\Windows",
+    "CONDA_PREFIX": "C:\\Users\\chenmingyuan\\anaconda3",
+    "R_HOME": "C:\\Program Files\\R\\R-4.3.2"
+  },
+  "registry_notes": "已注册组件包括: 微软雅黑、思源黑体、Times New Roman、Computer Modern(LaTeX)等字体; DirectX 12运行时; Visual C++ 2015-2022可再发行组件包; .NET Framework 4.8; Anaconda Python 3.12解释器及conda环境; R 4.3.2统计引擎; Stata 17组件; TeX Live 2023编译器; Jupyter内核; 腾讯系软件COM组件(QQ、微信协议支持); WPS Office与Microsoft Office文档处理组件; 搜狗输入法引擎; 360安全组件及驱动",
+  "windows_features": [
+    "Windows Media Player",
+    "Internet Explorer 11",
+    ".NET Framework 3.5",
+    ".NET Framework 4.8 高级服务",
+    "适用于 Linux 的 Windows 子系统",
+    "Windows 照片查看器",
+    "打印和文档服务",
+    "远程桌面连接",
+    "Windows Defender防火墙",
+    "虚拟打印机 Microsoft Print to PDF",
+    "DirectX 12",
+    "蓝牙支持"
+  ]
+}
