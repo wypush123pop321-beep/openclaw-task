@@ -4,3 +4,9 @@ utils/__pycache__/*
 logs/*
 *log
 skills/skill_localize*
+
+# understand-anything 机器缓存产物(不入库;仅保留核心 knowledge-graph/meta/config/.understandignore)
+.understand-anything/fingerprints.json
+.understand-anything/intermediate/
+.understand-anything/.trash-*/
+.understand-anything/tmp*
