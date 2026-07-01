@@ -1,0 +1,34 @@
+# .understandignore — patterns for files/dirs to exclude from analysis
+# Syntax: same as .gitignore (globs, # comments, ! negation, trailing / for dirs)
+#
+# Built-in defaults (always excluded unless negated):
+#   node_modules/, .git/, dist/, build/, obj/, *.lock, *.min.js, etc.
+
+# --- 安装的技能库(25k+ 文件, 第三方包, 非本项目代码) ---
+skills/
+
+# --- 任务样例数据/结果/备份/二进制(非代码) ---
+configs/
+
+# --- 运行时产物 ---
+logs/
+workspaces/
+*.log
+.claude/
+.vscode/
+
+# --- Python 缓存 ---
+*__pycache__*
+utils/__pycache__/
+
+# --- 备份与本地化临时文件 ---
+*.bak
+*.ubak
+skills/skill_localize*
+
+# --- 二进制/数据(散落在其他目录时) ---
+*.rar
+*.zip
+*.pdf
+*.xlsx
+*.DS_Store

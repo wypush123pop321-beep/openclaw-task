@@ -1,0 +1,5337 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "openclaw-task",
+    "languages": [
+      "json",
+      "markdown",
+      "python",
+      "txt",
+      "yaml"
+    ],
+    "frameworks": [
+      "openclaw-sdk",
+      "aiohttp",
+      "Pydantic"
+    ],
+    "description": "基于 openclaw-sdk 的配置驱动 AI Agent 任务编排与评估框架",
+    "analyzedAt": "2026-07-01T12:45:44Z",
+    "gitCommitHash": "e2ce5653b4f6e37907d319719938d3259edb2303"
+  },
+  "nodes": [
+    {
+      "id": "file:evaluator.py",
+      "type": "file",
+      "name": "evaluator.py",
+      "filePath": "evaluator.py",
+      "summary": "评估器核心模块，基于 rubric/oracle 对 agent 每轮输出打分，包含配置解析、加权门控评分器 Scorer、结构化提示词构建与持久化 agent 交互逻辑。",
+      "tags": [
+        "评估器",
+        "scoring",
+        "rubric",
+        "prompt-engineering",
+        "service",
+        "tested"
+      ],
+      "complexity": "complex",
+      "languageNotes": "大量使用 Pydantic 模型（Rubric/ScoringSpec/EvaluationResult）承载配置与结构化输出，并通过 _load_prompt_sections 从外部模板文件按 section 标记加载提示词。"
+    },
+    {
+      "id": "class:evaluator.py:Rubric",
+      "type": "class",
+      "name": "Rubric",
+      "filePath": "evaluator.py",
+      "lineRange": [
+        45,
+        69
+      ],
+      "summary": "单条评分标准的 Pydantic 模型，含 id/when/evaluator/text 等字段，from_raw 支持从字符串或字典归一化构造。",
+      "tags": [
+        "data-model",
+        "rubric",
+        "pydantic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:evaluator.py:ScoringSpec",
+      "type": "class",
+      "name": "ScoringSpec",
+      "filePath": "evaluator.py",
+      "lineRange": [
+        78,
+        105
+      ],
+      "summary": "评分规格模型，定义门控 rubric 集合、加权 bucket 与 gate_zero 一票否决策略，from_scoring 从原始配置解析。",
+      "tags": [
+        "data-model",
+        "scoring",
+        "配置解析",
+        "pydantic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:evaluator.py:Scorer",
+      "type": "class",
+      "name": "Scorer",
+      "filePath": "evaluator.py",
+      "lineRange": [
+        108,
+        154
+      ],
+      "summary": "依据 ScoringSpec 对 rubric 检查结果计算加权完成度分数，处理门控否决、bucket 权重归一与缺失检查补零。",
+      "tags": [
+        "scoring",
+        "加权算法",
+        "门控",
+        "service"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:evaluator.py:EvaluateConfig",
+      "type": "class",
+      "name": "EvaluateConfig",
+      "filePath": "evaluator.py",
+      "lineRange": [
+        157,
+        223
+      ],
+      "summary": "评估器运行配置的 Pydantic 模型，聚合 rubric/oracle/scoring 引用与运行时字段，resolve_runtime 将原始引用解析为结构化对象。",
+      "tags": [
+        "config",
+        "data-model",
+        "配置解析",
+        "pydantic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:evaluator.py:EvaluationResult",
+      "type": "class",
+      "name": "EvaluationResult",
+      "filePath": "evaluator.py",
+      "lineRange": [
+        234,
+        248
+      ],
+      "summary": "评估结构化输出模型，承载完成度、倾向、改进建议、违规、引用、rubric 检查列表与 bucket/门控分数。",
+      "tags": [
+        "data-model",
+        "结构化输出",
+        "pydantic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:evaluator.py:Evaluator",
+      "type": "class",
+      "name": "Evaluator",
+      "filePath": "evaluator.py",
+      "lineRange": [
+        309,
+        577
+      ],
+      "summary": "评估器主类，驱动持久化 agent 逐轮评估：构建注入 rubric/oracle 的提示词、执行结构化输出、收集检查结果打分、格式化反馈并记录评估日志。",
+      "tags": [
+        "评估器",
+        "service",
+        "prompt-engineering",
+        "api-handler"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:evaluator.py:_load_prompt_sections",
+      "type": "function",
+      "name": "_load_prompt_sections",
+      "filePath": "evaluator.py",
+      "lineRange": [
+        281,
+        299
+      ],
+      "summary": "从外部模板文件按 section 标记（正则匹配）解析出命名的提示词片段字典，供构建评估提示词复用。",
+      "tags": [
+        "utility",
+        "prompt-engineering",
+        "解析"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:trajectory.py",
+      "type": "file",
+      "name": "trajectory.py",
+      "filePath": "trajectory.py",
+      "summary": "轨迹采集模块，定义工具调用/文件证据/单轮记录/整条轨迹的数据模型，并从 chat_history 提取 tool_calls、以磁盘真值校正 agent 自述文件证据。",
+      "tags": [
+        "轨迹采集",
+        "data-model",
+        "证据采集",
+        "serialization",
+        "tested"
+      ],
+      "complexity": "complex",
+      "languageNotes": "以 Pydantic 模型为主，含 async 的文件证据抓取（gateway.agents_files_get），并通过 _strip_nul 清理 NUL 字节、以磁盘存在性覆盖 agent 的文件生成自述。"
+    },
+    {
+      "id": "class:trajectory.py:ToolCallEvidence",
+      "type": "class",
+      "name": "ToolCallEvidence",
+      "filePath": "trajectory.py",
+      "lineRange": [
+        37,
+        47
+      ],
+      "summary": "单次工具调用证据的 Pydantic 模型，记录工具名、输入、输出与耗时。",
+      "tags": [
+        "data-model",
+        "证据采集",
+        "pydantic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:trajectory.py:FileEvidence",
+      "type": "class",
+      "name": "FileEvidence",
+      "filePath": "trajectory.py",
+      "lineRange": [
+        50,
+        63
+      ],
+      "summary": "生成文件证据的 Pydantic 模型，记录文件名、是否核查、是否存在、大小、内容、路径、错误及是否为发现型文件。",
+      "tags": [
+        "data-model",
+        "证据采集",
+        "pydantic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:trajectory.py:TurnRecord",
+      "type": "class",
+      "name": "TurnRecord",
+      "filePath": "trajectory.py",
+      "lineRange": [
+        65,
+        73
+      ],
+      "summary": "单轮对话记录模型，聚合用户输入、agent 内容、工具调用、文件证据、停止原因与证据不完整标记。",
+      "tags": [
+        "data-model",
+        "轨迹采集",
+        "pydantic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:trajectory.py:Trajectory",
+      "type": "class",
+      "name": "Trajectory",
+      "filePath": "trajectory.py",
+      "lineRange": [
+        76,
+        121
+      ],
+      "summary": "整条任务轨迹模型，聚合所有轮次与评估结果，提供保存、全量/近期渲染及生成文件指针汇总方法。",
+      "tags": [
+        "data-model",
+        "轨迹采集",
+        "serialization",
+        "pydantic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:trajectory.py:_render_turn",
+      "type": "function",
+      "name": "_render_turn",
+      "filePath": "trajectory.py",
+      "lineRange": [
+        124,
+        151
+      ],
+      "summary": "将单轮记录渲染为完整文本表示，展开用户输入、工具调用与文件证据等细节。",
+      "tags": [
+        "utility",
+        "serialization",
+        "渲染"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:trajectory.py:_render_turn_compact",
+      "type": "function",
+      "name": "_render_turn_compact",
+      "filePath": "trajectory.py",
+      "lineRange": [
+        154,
+        172
+      ],
+      "summary": "将单轮记录渲染为紧凑文本，用于评估提示词中的近期上下文窗口展示。",
+      "tags": [
+        "utility",
+        "serialization",
+        "渲染"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:trajectory.py:_normalize_input",
+      "type": "function",
+      "name": "_normalize_input",
+      "filePath": "trajectory.py",
+      "lineRange": [
+        179,
+        198
+      ],
+      "summary": "归一化工具调用输入，将 JSON 字符串尝试解析为原生结构，兼容字符串与字典两种形态。",
+      "tags": [
+        "utility",
+        "serialization",
+        "归一化"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:trajectory.py:_block_text",
+      "type": "function",
+      "name": "_block_text",
+      "filePath": "trajectory.py",
+      "lineRange": [
+        217,
+        226
+      ],
+      "summary": "从消息 content 块提取纯文本，兼容字符串、列表分块与字典结构并清理 NUL 字节。",
+      "tags": [
+        "utility",
+        "serialization",
+        "解析"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:trajectory.py:extract_tool_calls",
+      "type": "function",
+      "name": "extract_tool_calls",
+      "filePath": "trajectory.py",
+      "lineRange": [
+        229,
+        267
+      ],
+      "summary": "从 chat_history 消息序列中解析出工具调用及其结果，按 id 配对 tool_use 与 tool_result，构造 ToolCallEvidence 列表。",
+      "tags": [
+        "证据采集",
+        "解析",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:trajectory.py:build_turn_record",
+      "type": "function",
+      "name": "build_turn_record",
+      "filePath": "trajectory.py",
+      "lineRange": [
+        270,
+        302
+      ],
+      "summary": "从一轮执行结果构造 TurnRecord，整合工具调用与自述文件证据，并标记证据是否不完整（fallback）。",
+      "tags": [
+        "轨迹采集",
+        "证据采集",
+        "factory"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:trajectory.py:_resolve_file_evidence",
+      "type": "function",
+      "name": "_resolve_file_evidence",
+      "filePath": "trajectory.py",
+      "lineRange": [
+        318,
+        379
+      ],
+      "summary": "解析单个文件证据的真值：优先从 gateway 拉取内容、回退本地磁盘读取，以磁盘存在性覆盖 agent 自述声明。",
+      "tags": [
+        "证据采集",
+        "async",
+        "验证"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:trajectory.py:capture_file_evidence",
+      "type": "function",
+      "name": "capture_file_evidence",
+      "filePath": "trajectory.py",
+      "lineRange": [
+        382,
+        434
+      ],
+      "summary": "异步采集本轮全部文件证据：列出 agent 工作区文件、解析每份自述证据，并在自述为空时发现型补齐工作区新文件。",
+      "tags": [
+        "证据采集",
+        "async",
+        "discovery"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:test/test_evaluator.py",
+      "type": "file",
+      "name": "test_evaluator.py",
+      "filePath": "test/test_evaluator.py",
+      "summary": "评估器单元测试，覆盖结构化输出解析、误报上浮、反馈格式化、rubric 提示词注入及无 rubric 时 rubric_checks 归一化等行为。",
+      "tags": [
+        "测试",
+        "评估器",
+        "unit-test"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:test/test_scoring.py",
+      "type": "file",
+      "name": "test_scoring.py",
+      "filePath": "test/test_scoring.py",
+      "summary": "评分逻辑单元测试，覆盖 Rubric.from_raw、全通过完成度、门控一票否决、bucket 加权比例、缺失检查补零与空配置回退。",
+      "tags": [
+        "测试",
+        "scoring",
+        "unit-test"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:test/test_trajectory.py",
+      "type": "file",
+      "name": "test_trajectory.py",
+      "filePath": "test/test_trajectory.py",
+      "summary": "轨迹采集单元测试，覆盖工具调用捕获、fallback 标记、磁盘真值覆盖自述、抓取错误降级、工作区文件发现及 chat_history 工具调用提取的边界情况。",
+      "tags": [
+        "测试",
+        "轨迹采集",
+        "unit-test"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:openclaw_automation.py",
+      "type": "file",
+      "name": "openclaw_automation.py",
+      "filePath": "openclaw_automation.py",
+      "summary": "整个 OpenClaw 自动化任务系统的核心编排入口，通过 Pydantic 配置模型驱动工作区搭建、Agent 创建、多轮查询执行与评估流程。串联 user_simulator、evaluator、trajectory 及网关连接工具，实现配置到执行的完整闭环。",
+      "tags": [
+        "entry-point",
+        "orchestration",
+        "配置驱动",
+        "agent-management",
+        "workflow",
+        "tested"
+      ],
+      "complexity": "complex",
+      "languageNotes": "大量使用 Pydantic BaseModel 做配置校验（field_validator/model_validator），并配合 asyncio 异步执行 Agent 查询。"
+    },
+    {
+      "id": "class:openclaw_automation.py:InputDirConfig",
+      "type": "class",
+      "name": "InputDirConfig",
+      "filePath": "openclaw_automation.py",
+      "lineRange": [
+        111,
+        145
+      ],
+      "summary": "输入目录配置模型，定义 skill_dir/user_dir/agent_dir，并通过校验器将字符串/字典形式的 user_dir 归一化为 UserDirConfig 并处理临时目录兜底。",
+      "tags": [
+        "配置",
+        "data-model",
+        "validation",
+        "pydantic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:openclaw_automation.py:AgentConfigItem",
+      "type": "class",
+      "name": "AgentConfigItem",
+      "filePath": "openclaw_automation.py",
+      "lineRange": [
+        148,
+        157
+      ],
+      "summary": "单个 Agent 的配置项模型，描述名称、技能、系统提示词、模型及模型服务商等接入参数。",
+      "tags": [
+        "配置",
+        "data-model",
+        "agent-management",
+        "pydantic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:openclaw_automation.py:QueryItem",
+      "type": "class",
+      "name": "QueryItem",
+      "filePath": "openclaw_automation.py",
+      "lineRange": [
+        160,
+        179
+      ],
+      "summary": "单条查询任务的配置模型，包含目标 Agent、文本、会话名、超时、是否启用模拟器与评估配置，并可派生 is_noise 干扰标记。",
+      "tags": [
+        "配置",
+        "data-model",
+        "query",
+        "pydantic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:openclaw_automation.py:AutomationConfig",
+      "type": "class",
+      "name": "AutomationConfig",
+      "filePath": "openclaw_automation.py",
+      "lineRange": [
+        182,
+        217
+      ],
+      "summary": "顶层自动化配置模型，聚合系统、输入目录、Agent 列表、查询列表及网关与模拟器参数，并对 gateway_ws_url 做归一化处理。",
+      "tags": [
+        "配置",
+        "data-model",
+        "orchestration",
+        "pydantic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:openclaw_automation.py:WorkspaceManager",
+      "type": "class",
+      "name": "WorkspaceManager",
+      "filePath": "openclaw_automation.py",
+      "lineRange": [
+        224,
+        376
+      ],
+      "summary": "工作区管理器，负责为每个 Agent 创建独立工作目录、拷贝技能/用户目录/Agent 定义文件，并支持通过映射文件批量铺设初始文件。",
+      "tags": [
+        "工作区管理",
+        "file-management",
+        "service",
+        "setup"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:openclaw_automation.py:AgentManager",
+      "type": "class",
+      "name": "AgentManager",
+      "filePath": "openclaw_automation.py",
+      "lineRange": [
+        461,
+        538
+      ],
+      "summary": "Agent 管理器，通过 OpenClaw 客户端创建 Agent、固定模型（pin model）并等待网关就绪，封装与网关交互的生命周期逻辑。",
+      "tags": [
+        "agent-management",
+        "service",
+        "gateway",
+        "setup"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:openclaw_automation.py:OpenClawAutomation",
+      "type": "class",
+      "name": "OpenClawAutomation",
+      "filePath": "openclaw_automation.py",
+      "lineRange": [
+        1084,
+        1204
+      ],
+      "summary": "自动化主控类，串联工作区搭建、映射文件解析、Agent 创建与评估器校验，并驱动整体 run 流程执行全部查询。",
+      "tags": [
+        "orchestration",
+        "entry-point",
+        "workflow",
+        "service"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:openclaw_automation.py:ConfigLoader",
+      "type": "class",
+      "name": "ConfigLoader",
+      "filePath": "openclaw_automation.py",
+      "lineRange": [
+        1278,
+        1315
+      ],
+      "summary": "配置加载器，从 JSON/YAML 文件或字典构建 AutomationConfig，并解析 evaluate 段中的 $ref JSON 指针引用。",
+      "tags": [
+        "配置",
+        "loader",
+        "factory",
+        "serialization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:openclaw_automation.py:setup_logger",
+      "type": "function",
+      "name": "setup_logger",
+      "filePath": "openclaw_automation.py",
+      "lineRange": [
+        43,
+        75
+      ],
+      "summary": "初始化项目日志系统，配置文件与控制台双输出 handler，并按配置文件名派生日志目录。",
+      "tags": [
+        "logging",
+        "utility",
+        "setup"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:openclaw_automation.py:create_simulator",
+      "type": "function",
+      "name": "create_simulator",
+      "filePath": "openclaw_automation.py",
+      "lineRange": [
+        383,
+        434
+      ],
+      "summary": "工厂函数，读取用户画像、代理配置与用户目录清单，构建并返回配置好的 User_simulator 用户模拟器实例。",
+      "tags": [
+        "factory",
+        "simulator",
+        "setup"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:openclaw_automation.py:create_evaluator",
+      "type": "function",
+      "name": "create_evaluator",
+      "filePath": "openclaw_automation.py",
+      "lineRange": [
+        437,
+        454
+      ],
+      "summary": "工厂函数，基于评估配置、客户端与会话信息创建 Evaluator 评估器实例。",
+      "tags": [
+        "factory",
+        "evaluator",
+        "setup"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:openclaw_automation.py:process_turn",
+      "type": "function",
+      "name": "process_turn",
+      "filePath": "openclaw_automation.py",
+      "lineRange": [
+        621,
+        698
+      ],
+      "summary": "处理单轮对话：从聊天历史采集新增消息、提取工具调用与文件证据、构建轨迹记录并触发逐轮评估与反馈格式化。",
+      "tags": [
+        "trajectory",
+        "evaluation",
+        "turn-processing",
+        "event-handler"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:openclaw_automation.py:execute_queries",
+      "type": "function",
+      "name": "execute_queries",
+      "filePath": "openclaw_automation.py",
+      "lineRange": [
+        701,
+        1076
+      ],
+      "summary": "核心执行引擎，异步驱动所有查询的多轮对话，处理网关健康检查、断线重连、历史回退兜底、模拟器交互与逐轮评估的完整循环。",
+      "tags": [
+        "orchestration",
+        "async",
+        "query-execution",
+        "retry",
+        "workflow"
+      ],
+      "complexity": "complex",
+      "languageNotes": "内部定义多个闭包（check_readyz/fetch_history/execute_with_retry/history_fallback 等）实现异步重试与聊天历史回退逻辑。"
+    },
+    {
+      "id": "function:openclaw_automation.py:_resolve_evaluate_refs",
+      "type": "function",
+      "name": "_resolve_evaluate_refs",
+      "filePath": "openclaw_automation.py",
+      "lineRange": [
+        1226,
+        1275
+      ],
+      "summary": "解析配置中 evaluate 段的 $ref JSON 指针引用，将外部 rubric/scoring 引用内联进配置并触发运行时解析。",
+      "tags": [
+        "配置",
+        "json-pointer",
+        "serialization",
+        "resolution"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:openclaw_automation.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "openclaw_automation.py",
+      "lineRange": [
+        1322,
+        1352
+      ],
+      "summary": "程序主入口，初始化日志、从文件或字典加载配置并实例化 OpenClawAutomation 执行整体运行。",
+      "tags": [
+        "entry-point",
+        "async",
+        "bootstrap"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:user_simulator.py",
+      "type": "file",
+      "name": "user_simulator.py",
+      "filePath": "user_simulator.py",
+      "summary": "用户模拟器模块，基于 LLM（OpenAI 客户端）扮演真实用户，依据用户画像、目录与对话历史生成多轮追问，用于自动化任务的交互仿真。",
+      "tags": [
+        "simulator",
+        "llm",
+        "component",
+        "user-simulation",
+        "tested"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "通过 httpx.Client 注入自定义代理，并用模板字符串 replace 渲染系统提示词。"
+    },
+    {
+      "id": "class:user_simulator.py:User_simulator",
+      "type": "class",
+      "name": "User_simulator",
+      "filePath": "user_simulator.py",
+      "lineRange": [
+        19,
+        147
+      ],
+      "summary": "用户模拟器核心类，加载提示词模板、渲染上下文、维护对话历史，并调用 LLM 生成模拟用户回复，同时记录 API 调用日志。",
+      "tags": [
+        "simulator",
+        "llm",
+        "component",
+        "conversation"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:test/test_scoring_ref.py",
+      "type": "file",
+      "name": "test_scoring_ref.py",
+      "filePath": "test/test_scoring_ref.py",
+      "summary": "针对 scoring_ref 配置解析的单元测试，验证 $ref 评分引用可正确解析、缺省单桶回退以及缺失引用时的异常行为。",
+      "tags": [
+        "test",
+        "配置",
+        "validation",
+        "scoring"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:test/test_scoring_ref.py:_build_env",
+      "type": "function",
+      "name": "_build_env",
+      "filePath": "test/test_scoring_ref.py",
+      "lineRange": [
+        43,
+        72
+      ],
+      "summary": "测试夹具辅助函数，在临时目录中构建包含 oracle、user_queries 与任务配置的完整测试环境。",
+      "tags": [
+        "test",
+        "fixture",
+        "setup"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:test/test_simulator.py",
+      "type": "file",
+      "name": "test_simulator.py",
+      "filePath": "test/test_simulator.py",
+      "summary": "用户模拟器的手动/集成测试脚本，加载代理配置与用户画像，构建 User_simulator 并驱动多轮对话验证其交互输出。",
+      "tags": [
+        "test",
+        "simulator",
+        "integration-test"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:test/test_simulator.py:run_test",
+      "type": "function",
+      "name": "run_test",
+      "filePath": "test/test_simulator.py",
+      "lineRange": [
+        56,
+        96
+      ],
+      "summary": "测试主流程，加载配置与画像实例化 User_simulator，按指定轮数循环调用并打印每轮模拟用户回复。",
+      "tags": [
+        "test",
+        "simulator",
+        "driver"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/run_eval_experiment.py",
+      "type": "file",
+      "name": "run_eval_experiment.py",
+      "filePath": "openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/run_eval_experiment.py",
+      "summary": "OpenSpec 变更归档中的评估实验脚本，导入并调用 openclaw_automation 以运行一次评估实验，属于历史变更提案的配套脚本。",
+      "tags": [
+        "script",
+        "experiment",
+        "evaluation",
+        "archive"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:scripts/run_all_hard_tasks.py",
+      "type": "file",
+      "name": "run_all_hard_tasks.py",
+      "filePath": "scripts/run_all_hard_tasks.py",
+      "summary": "串行批跑 configs/hard_tasks_0630 两批硬任务的核心脚本,提供任务收集、user_query 备份/还原、日志解析与实时汇总等共享工具函数,供其他批跑脚本复用。",
+      "tags": [
+        "entry-point",
+        "script",
+        "batch-runner",
+        "utility",
+        "logging"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "使用 \\\\?\\ 长路径前缀绕过 Windows MAX_PATH 限制;通过 subprocess.run 串行调度任务并设单任务硬超时。"
+    },
+    {
+      "id": "function:scripts/run_all_hard_tasks.py:collect",
+      "type": "function",
+      "name": "collect",
+      "filePath": "scripts/run_all_hard_tasks.py",
+      "lineRange": [
+        36,
+        47
+      ],
+      "summary": "遍历 dailyclawbench 与 hard_tasks 目录,收集所有待跑任务的批次名与 q1 配置路径,返回排序后的任务列表。",
+      "tags": [
+        "utility",
+        "task-collection",
+        "filesystem"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/run_all_hard_tasks.py:ensure_ubak",
+      "type": "function",
+      "name": "ensure_ubak",
+      "filePath": "scripts/run_all_hard_tasks.py",
+      "lineRange": [
+        55,
+        59
+      ],
+      "summary": "为 user_query 文件创建 .ubak 备份(若尚不存在),用于任务跑完后还原被改动的输入文件。",
+      "tags": [
+        "utility",
+        "backup",
+        "filesystem"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/run_all_hard_tasks.py:restore_if_missing",
+      "type": "function",
+      "name": "restore_if_missing",
+      "filePath": "scripts/run_all_hard_tasks.py",
+      "lineRange": [
+        62,
+        68
+      ],
+      "summary": "在 user_query 源文件缺失时从 .ubak 备份还原,保证批跑过程中被删除的输入文件可恢复。",
+      "tags": [
+        "utility",
+        "restore",
+        "filesystem"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/run_all_hard_tasks.py:parse_log",
+      "type": "function",
+      "name": "parse_log",
+      "filePath": "scripts/run_all_hard_tasks.py",
+      "lineRange": [
+        71,
+        87
+      ],
+      "summary": "用正则从单任务日志中解析 completion 评分、对话轮数与失败原因,供汇总表使用。",
+      "tags": [
+        "utility",
+        "log-parsing",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/run_all_hard_tasks.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/run_all_hard_tasks.py",
+      "lineRange": [
+        90,
+        144
+      ],
+      "summary": "批跑主流程:收集任务、逐个串行调用子进程执行、设硬超时、解析日志并实时把结果追加进 batch_summary.md。",
+      "tags": [
+        "entry-point",
+        "batch-runner",
+        "orchestration"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:scripts/rerun_batchA.py",
+      "type": "file",
+      "name": "rerun_batchA.py",
+      "filePath": "scripts/rerun_batchA.py",
+      "summary": "重跑 A 批(dailyclawbench)任务的脚本,复用 run_all_hard_tasks 的工具函数完成任务收集、输入备份还原与串行执行汇总。",
+      "tags": [
+        "script",
+        "batch-runner",
+        "entry-point",
+        "logging"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/rerun_batchA.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/rerun_batchA.py",
+      "lineRange": [
+        27,
+        76
+      ],
+      "summary": "重跑 A 批任务主流程:收集任务、串行执行子进程并带超时、解析日志、把结果写入汇总文件。",
+      "tags": [
+        "entry-point",
+        "batch-runner",
+        "orchestration"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:scripts/rerun_batchA_final.py",
+      "type": "file",
+      "name": "rerun_batchA_final.py",
+      "filePath": "scripts/rerun_batchA_final.py",
+      "summary": "A 批任务的最终重跑脚本,增加 done 文件断点续跑机制(read_done/mark_done),避免重复执行已完成任务,复用 run_all_hard_tasks 的共享工具。",
+      "tags": [
+        "script",
+        "batch-runner",
+        "entry-point",
+        "checkpoint",
+        "logging"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/rerun_batchA_final.py:read_done",
+      "type": "function",
+      "name": "read_done",
+      "filePath": "scripts/rerun_batchA_final.py",
+      "lineRange": [
+        30,
+        37
+      ],
+      "summary": "读取 done 记录文件,返回已完成任务名集合,用于断点续跑时跳过已跑任务。",
+      "tags": [
+        "utility",
+        "checkpoint",
+        "filesystem"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/rerun_batchA_final.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/rerun_batchA_final.py",
+      "lineRange": [
+        45,
+        93
+      ],
+      "summary": "最终重跑主流程:读取 done 集合跳过已完成任务,串行执行剩余任务、解析日志、标记完成并追加汇总。",
+      "tags": [
+        "entry-point",
+        "batch-runner",
+        "orchestration",
+        "checkpoint"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/MAP_Windows.json",
+      "type": "config",
+      "name": "MAP_Windows.json",
+      "filePath": "0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/MAP_Windows.json",
+      "summary": "虚拟路径到真实 Windows 路径的映射表，将任务中引用的《调研数据.xlsx》虚拟路径解析到本机真实文件位置，供文件环境（file_env）任务运行时定位数据文件。",
+      "tags": [
+        "configuration",
+        "path-mapping",
+        "file-env",
+        "windows",
+        "task-fixture"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/env_config.json",
+      "type": "config",
+      "name": "env_config.json",
+      "filePath": "0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/env_config.json",
+      "summary": "模拟 Windows 环境配置快照，描述系统信息、硬件、已装软件、浏览器、最近文件、桌面快捷方式、计划任务与环境变量等，为科研助手任务提供逼真的沙盒运行上下文。",
+      "tags": [
+        "configuration",
+        "environment",
+        "sandbox",
+        "windows",
+        "task-fixture"
+      ],
+      "complexity": "complex",
+      "languageNotes": "398 行的大型环境模拟配置，含 12 个顶层字段（system/hardware/installed_software/browser 等），用于给 Agent 构造可信的桌面环境画像。"
+    },
+    {
+      "id": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/oracle.json",
+      "type": "config",
+      "name": "oracle.json",
+      "filePath": "0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/oracle.json",
+      "summary": "任务标准答案（ground truth），记录从真实 xlsx（20 行）精算得到的均值、样本标准差、两两 Pearson 相关系数与 p 值及显著性判定，被 user_queries 的评估配置通过 oracle_ref 引用作为打分基准。",
+      "tags": [
+        "configuration",
+        "ground-truth",
+        "oracle",
+        "evaluation",
+        "task-fixture"
+      ],
+      "complexity": "simple",
+      "languageNotes": "derived 字段中的 r/p/显著性数值即评估 rubric（C1–C5）的 gt_ref 引用目标。"
+    },
+    {
+      "id": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/results_4pilot.json",
+      "type": "config",
+      "name": "results_4pilot.json",
+      "filePath": "0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/results_4pilot.json",
+      "summary": "四个 solver 模型（opus/gpt/deepseek/gemini）在本任务上的试跑评估结果，含各模型的总分 R、gate 失败项、correctness/provenance/process 分桶得分、动作序列与完整回答文本。",
+      "tags": [
+        "configuration",
+        "evaluation",
+        "pilot-results",
+        "benchmark",
+        "task-fixture"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "provenance 桶得分差异（opus/gpt=1.0 vs ds/gemini=0.0）体现了可追溯性评估对结果分差的关键影响。"
+    },
+    {
+      "id": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/user_profile_08_经济学硕士生_Stats.json",
+      "type": "config",
+      "name": "user_profile_08_经济学硕士生_Stats.json",
+      "filePath": "0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/user_profile_08_经济学硕士生_Stats.json",
+      "summary": "任务用户画像（经济学硕士生「陈明远」），描述其基本信息、生活/学习偏好、常用工具与真实需求，用于给 Agent 提供人格化上下文，塑造对精确统计计算的期望。",
+      "tags": [
+        "configuration",
+        "user-profile",
+        "persona",
+        "task-fixture"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/user_queries.json",
+      "type": "config",
+      "name": "user_queries.json",
+      "filePath": "0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/user_queries.json",
+      "summary": "任务核心定义文件，包含用户查询、所需文件、rubrics 评分项及完整 evaluate 配置（evaluator agent、oracle_ref、custom_rubrics G1–P1、分桶权重与聚合规则），驱动整个描述统计与相关分析任务的编排与评估。",
+      "tags": [
+        "configuration",
+        "task-definition",
+        "rubrics",
+        "evaluation",
+        "task-fixture"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "evaluate.custom_rubrics 通过 gt_ref 指向 oracle.json 的 derived/real_facts 字段，oracle_ref 显式声明为 oracle.json，构成任务→标准答案的评估依赖。"
+    },
+    {
+      "id": "document:README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "README.md",
+      "summary": "OpenClaw 自动化任务系统的项目总览文档，涵盖快速开始、配置结构、核心组件（ConfigLoader、WorkspaceManager、AgentManager、QueryOrchestrator、OpenClawAutomation、Evaluator）、系统架构、最佳实践与故障排查等 63 个章节。",
+      "tags": [
+        "documentation",
+        "entry-point",
+        "overview",
+        "architecture"
+      ],
+      "complexity": "complex",
+      "languageNotes": "长篇中文技术文档，按快速开始→配置→核心组件→架构→最佳实践的教学式层级组织。"
+    },
+    {
+      "id": "document:evaluator_user_prompt.md",
+      "type": "document",
+      "name": "evaluator_user_prompt.md",
+      "filePath": "evaluator_user_prompt.md",
+      "summary": "第三方评估裁判（Evaluator）的用户提示词模板，注入原始任务、最近若干轮执行证据、产物文件指针、Ground-Truth（Oracle）与验收清单（Rubric），驱动对 Agent 结果的裁决。",
+      "tags": [
+        "documentation",
+        "prompt-template",
+        "evaluation",
+        "configuration"
+      ],
+      "complexity": "simple",
+      "languageNotes": "含 {window} 等变量占位符的提示词模板，运行时由评估器做变量替换后填充。"
+    },
+    {
+      "id": "config:requirements.txt",
+      "type": "config",
+      "name": "requirements.txt",
+      "filePath": "requirements.txt",
+      "summary": "Python 依赖清单，锁定 openclaw-sdk==2.1.0 并引入 aiohttp，作为项目运行的基础依赖。",
+      "tags": [
+        "configuration",
+        "dependencies",
+        "build-system",
+        "python"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:system_prompt.md",
+      "type": "document",
+      "name": "system_prompt.md",
+      "filePath": "system_prompt.md",
+      "summary": "用户模拟角色的系统提示词模板，定义用户画像、用户文件目录、核心原则、行为规范、禁止行为与对话结束条件，并注入 Origin_query、对话历史与第三方评估反馈。",
+      "tags": [
+        "documentation",
+        "prompt-template",
+        "user-simulation",
+        "configuration"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "含 Origin_query、Conversation History、Evaluator Feedback 等运行时注入占位符的角色设定模板。"
+    },
+    {
+      "id": "document:docs/CHANGELOG.md",
+      "type": "document",
+      "name": "CHANGELOG.md",
+      "filePath": "docs/CHANGELOG.md",
+      "summary": "版本更新日志，按语义化版本（v1.0.0 至 v1.0.4）记录每个版本的 Bug 修复、核心功能、升级指南与已知问题，并列出后续 v1.1.0/v1.2.0 计划。",
+      "tags": [
+        "documentation",
+        "changelog",
+        "版本历史",
+        "release-notes"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:docs/COMPLETE_FIX_SUMMARY.md",
+      "type": "document",
+      "name": "COMPLETE_FIX_SUMMARY.md",
+      "filePath": "docs/COMPLETE_FIX_SUMMARY.md",
+      "summary": "v1.0.3 完整修复总结，串联 v1.0.0→v1.0.3 的四轮修复历程（手动 __aenter__、直接 async with 协程、错误 timeout 传递、ExecutionOptions 修正），并给出正确代码、API 参考与验证清单。",
+      "tags": [
+        "documentation",
+        "修复记录",
+        "bugfix-summary",
+        "async"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:docs/CONFIG_STRUCTURE.md",
+      "type": "document",
+      "name": "CONFIG_STRUCTURE.md",
+      "filePath": "docs/CONFIG_STRUCTURE.md",
+      "summary": "论文阅读任务的配置结构说明，讲解 input_dir、agents、workspace_base、evaluator 及 rubric 字段的含义与执行流程，并附检查清单与工作空间验证方法。",
+      "tags": [
+        "documentation",
+        "configuration",
+        "配置说明",
+        "workspace"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:docs/CONFIG_STRUCTURE_v1.0.4.md",
+      "type": "document",
+      "name": "CONFIG_STRUCTURE_v1.0.4.md",
+      "filePath": "docs/CONFIG_STRUCTURE_v1.0.4.md",
+      "summary": "v1.0.4 配置结构变更说明，重点介绍 user_dir 整体复制到工作空间的关键改进及其优势，附配置示例与执行输出。",
+      "tags": [
+        "documentation",
+        "configuration",
+        "配置说明",
+        "user-dir"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:docs/DESIGN.md",
+      "type": "document",
+      "name": "DESIGN.md",
+      "filePath": "docs/DESIGN.md",
+      "summary": "系统总体设计文档，涵盖架构图、五大核心组件（ConfigLoader/WorkspaceManager/AgentManager/QueryOrchestrator/OpenClawAutomation）、轨迹捕获与第三方评估闭环、配置详解、使用指南、最佳实践与故障排查。",
+      "tags": [
+        "documentation",
+        "设计文档",
+        "architecture",
+        "overview"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:docs/DIRECTORY_STRUCTURE.md",
+      "type": "document",
+      "name": "DIRECTORY_STRUCTURE.md",
+      "filePath": "docs/DIRECTORY_STRUCTURE.md",
+      "summary": "项目目录结构说明，逐一解释 agents/、configs/、docs/、logs/ 及各 task 目录的职责，并给出添加新任务与日常维护的操作步骤。",
+      "tags": [
+        "documentation",
+        "目录结构",
+        "project-layout",
+        "guide"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:docs/FIX_SUMMARY.md",
+      "type": "document",
+      "name": "FIX_SUMMARY.md",
+      "filePath": "docs/FIX_SUMMARY.md",
+      "summary": "资源管理修复说明，记录 OpenClawClient 从手动 __aenter__ 到标准 async with 上下文管理器的正确用法，解释 __init__/run() 的重构与删除 _connect() 的原因。",
+      "tags": [
+        "documentation",
+        "修复记录",
+        "async",
+        "resource-management"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:docs/FIX_v1.0.2.md",
+      "type": "document",
+      "name": "FIX_v1.0.2.md",
+      "filePath": "docs/FIX_v1.0.2.md",
+      "summary": "v1.0.2 修复说明，聚焦 OpenClawClient.connect() 返回协程而非实例的问题，讲解异步上下文管理器协议并给出 run() 方法的正确修复代码。",
+      "tags": [
+        "documentation",
+        "修复记录",
+        "async",
+        "bugfix"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:docs/FIX_v1.0.3.md",
+      "type": "document",
+      "name": "FIX_v1.0.3.md",
+      "filePath": "docs/FIX_v1.0.3.md",
+      "summary": "v1.0.3 修复说明，纠正 Agent.execute() 的 timeout 传递方式，改用 ExecutionOptions 承载超时等参数，附字段详解、测试验证与相关修复历史。",
+      "tags": [
+        "documentation",
+        "修复记录",
+        "async",
+        "bugfix"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:docs/PAPER_QUICK_REF.md",
+      "type": "document",
+      "name": "PAPER_QUICK_REF.md",
+      "filePath": "docs/PAPER_QUICK_REF.md",
+      "summary": "论文分析配置的快速参考卡，提供文件清单、三步快速开始、Agent 信息、分析维度、目录结构、配置要点及常见故障排查。",
+      "tags": [
+        "documentation",
+        "快速参考",
+        "quickstart",
+        "paper-analysis"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:docs/PAPER_READER_GUIDE.md",
+      "type": "document",
+      "name": "PAPER_READER_GUIDE.md",
+      "filePath": "docs/PAPER_READER_GUIDE.md",
+      "summary": "论文阅读分析配置的完整使用指南，详解 paper_reader Agent 的 SOUL.md/USER.md 设置、四部分查询任务设计、运行流程、输出结果、高级用法与学习路径。",
+      "tags": [
+        "documentation",
+        "使用指南",
+        "paper-analysis",
+        "agent-config"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:docs/PROJECT_SUMMARY.md",
+      "type": "document",
+      "name": "PROJECT_SUMMARY.md",
+      "filePath": "docs/PROJECT_SUMMARY.md",
+      "summary": "项目交付清单，汇总核心代码、文档、示例配置与测试文件的规模与用途，并给出快速开始、文档阅读顺序、核心功能、系统架构、项目统计与学习路径。",
+      "tags": [
+        "documentation",
+        "项目总结",
+        "overview",
+        "delivery"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:docs/QUICKSTART.md",
+      "type": "document",
+      "name": "QUICKSTART.md",
+      "filePath": "docs/QUICKSTART.md",
+      "summary": "5 分钟快速入门指南，从环境准备、启动 OpenClaw、创建首个配置到运行任务与查看结果，并覆盖简单问答/内容创作/代码审查等常见场景与故障速查。",
+      "tags": [
+        "documentation",
+        "entry-point",
+        "quickstart",
+        "guide"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:docs/README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "docs/README.md",
+      "summary": "项目主文档，介绍 OpenClaw 自动化任务系统的特性、快速开始、配置结构、五大核心组件、变量替换、适用场景、系统架构、最佳实践、故障排查与扩展开发。",
+      "tags": [
+        "documentation",
+        "entry-point",
+        "overview",
+        "readme"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:openspec/changes/align-task-config-standard/.openspec.yaml",
+      "type": "config",
+      "name": ".openspec.yaml",
+      "filePath": "openspec/changes/align-task-config-standard/.openspec.yaml",
+      "summary": "OpenSpec 变更元数据文件，声明该变更目录使用的 schema 版本与创建时间，标识 align-task-config-standard 为一个受管理的规范变更。",
+      "tags": [
+        "configuration",
+        "openspec",
+        "metadata",
+        "schema-definition"
+      ],
+      "complexity": "simple",
+      "languageNotes": "极简 YAML 元数据（仅 schema/created 两个顶层键），供 OpenSpec 工具链识别变更目录。"
+    },
+    {
+      "id": "document:openspec/changes/align-task-config-standard/proposal.md",
+      "type": "document",
+      "name": "proposal.md",
+      "filePath": "openspec/changes/align-task-config-standard/proposal.md",
+      "summary": "align-task-config-standard 变更提案，说明将单任务配置 q1.json 对齐到 0701 新标准模板的动机、字段级改动（is_noise 派生、scoring→scoring_ref、删 role、加 Harness_Type）及对 openclaw_automation.py/evaluator.py 的影响。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "proposal",
+        "task-config-schema"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/align-task-config-standard/design.md",
+      "type": "document",
+      "name": "design.md",
+      "filePath": "openspec/changes/align-task-config-standard/design.md",
+      "summary": "align-task-config-standard 的设计文档，记录 5 项关键决策（is_noise 派生、scoring_ref 显式解析删兜底、相对引用基准维持 config_dir、role 清稿、Harness_Type 占位）及风险、迁移计划与遗留问题。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "design",
+        "decision-record"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/align-task-config-standard/tasks.md",
+      "type": "document",
+      "name": "tasks.md",
+      "filePath": "openspec/changes/align-task-config-standard/tasks.md",
+      "summary": "align-task-config-standard 的实施任务清单，分四组（模型字段调整、scoring_ref 解析与删兜底、配置迁移、测试与验证）追踪逐项落地状态，全部已勾选完成含端到端验证。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "task-list",
+        "checklist"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/.openspec.yaml",
+      "type": "config",
+      "name": ".openspec.yaml",
+      "filePath": "openspec/changes/archive/2026-06-23-add-trajectory-evaluator/.openspec.yaml",
+      "summary": "OpenSpec 变更目录的元数据文件，声明 schema 版本与创建时间，标识本目录为一个 add-trajectory-evaluator 变更提案。",
+      "tags": [
+        "configuration",
+        "openspec",
+        "metadata",
+        "schema-definition"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/proposal.md",
+      "type": "document",
+      "name": "proposal.md",
+      "filePath": "openspec/changes/archive/2026-06-23-add-trajectory-evaluator/proposal.md",
+      "summary": "变更提案文档，阐述为何将「用户模拟器兼裁判」拆分为独立的带工具 evaluator agent（根治话术型假阳性/假阴性），并列出新增能力 trajectory-capture、trajectory-evaluation 及对 openclaw_automation.py、user_simulator、system_prompt.md 的影响。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "proposal",
+        "trajectory-evaluator",
+        "overview"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/design.md",
+      "type": "document",
+      "name": "design.md",
+      "filePath": "openspec/changes/archive/2026-06-23-add-trajectory-evaluator/design.md",
+      "summary": "设计决策文档，记录 evaluator 方案的 10 项关键决策（D1-D10：独立 OC agent、逐轮在环评估、simulator 终审、无状态取证、磁盘真相取证、混合投递等）以及背景、风险权衡、迁移计划与遗留问题。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "design",
+        "architecture",
+        "decision-record"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "采用 Goals/Non-Goals、Decisions（含备选与否决理由）、Risks/Trade-offs 的 ADR 式设计文档结构。"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/tasks.md",
+      "type": "document",
+      "name": "tasks.md",
+      "filePath": "openspec/changes/archive/2026-06-23-add-trajectory-evaluator/tasks.md",
+      "summary": "实施任务清单，将 evaluator 变更拆为 6 个阶段（逐轮证据捕获、独立 evaluator agent 装配、证据投递与评估提示词、反馈闭环接入 simulator、评估落盘可观测、收尾验证），全部任务已勾选完成并附端到端实测结论。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "tasks",
+        "checklist",
+        "implementation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/.openspec.yaml",
+      "type": "config",
+      "name": ".openspec.yaml",
+      "filePath": "openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/.openspec.yaml",
+      "summary": "OpenSpec 变更元数据文件，声明该变更采用 spec-driven 模式并记录创建日期 2026-06-24，是本变更目录的清单入口。",
+      "tags": [
+        "configuration",
+        "openspec",
+        "metadata",
+        "spec-driven"
+      ],
+      "complexity": "simple",
+      "languageNotes": "极简 YAML 元数据，仅含 schema 与 created 两个顶层键。"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/proposal.md",
+      "type": "document",
+      "name": "proposal.md",
+      "filePath": "openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/proposal.md",
+      "summary": "变更提案，说明两个实跑暴露的问题：evaluator 无 rubric 时自拟准则污染日志、user_simulator 跨会话信息泄露，并给出对应修改与受影响文件（evaluator.py、openclaw_automation.py）。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "proposal",
+        "evaluator",
+        "session-isolation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/design.md",
+      "type": "document",
+      "name": "design.md",
+      "filePath": "openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/design.md",
+      "summary": "设计文档，记录两项关键决策：D1 无 rubric 时以 prompt 声明加解析后确定性保底双层置空 rubric_checks；D2 user_simulator 按 session_name 键控多实例以隔离记忆，含风险权衡与迁移回滚方案。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "design",
+        "decisions",
+        "session-isolation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/tasks.md",
+      "type": "document",
+      "name": "tasks.md",
+      "filePath": "openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/tasks.md",
+      "summary": "实施任务清单，分三组：evaluator 无 rubric 归一置空、simulator 按 session_name 隔离记忆、以 configs/config_session.json 为场景的回归验证（含离线单测与待联机核验项）。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "tasks",
+        "checklist",
+        "regression-test"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/.openspec.yaml",
+      "type": "config",
+      "name": ".openspec.yaml",
+      "filePath": "openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/.openspec.yaml",
+      "summary": "OpenSpec 变更元数据文件，记录该「evaluator 引入 rubric 逐条质检」变更的 schema 版本与创建时间戳。",
+      "tags": [
+        "configuration",
+        "openspec",
+        "metadata"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/proposal.md",
+      "type": "document",
+      "name": "proposal.md",
+      "filePath": "openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/proposal.md",
+      "summary": "变更提案：为 evaluator 引入随 query 传入并冻结的验收清单（rubric），逐条质检 agent 产物，并将 EvaluatorConfig.dry_run 改名为 feedback_to_simulator（BREAKING）。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "proposal",
+        "evaluator",
+        "rubric"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/design.md",
+      "type": "document",
+      "name": "design.md",
+      "filePath": "openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/design.md",
+      "summary": "设计文档：阐述 rubric 质检的六项决策（用途/来源冻结/回流边界 X/数据模型 RubricCheck/开关改名/落盘），并给出风险、迁移与遗留问题。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "design",
+        "evaluator",
+        "rubric"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "遵循 OpenSpec design.md 惯例：Context / Goals-Non-Goals / Decisions / Risks / Migration / Open Questions 分节。"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/tasks.md",
+      "type": "document",
+      "name": "tasks.md",
+      "filePath": "openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/tasks.md",
+      "summary": "实施任务清单：分六组（数据模型/rubric 注入质检/编排接入/兼容回滚/测试/配置文档）跟踪落地进度，全部条目已勾选完成。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "tasks",
+        "checklist"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/.openspec.yaml",
+      "type": "config",
+      "name": ".openspec.yaml",
+      "filePath": "openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/.openspec.yaml",
+      "summary": "OpenSpec 变更元数据文件，声明该变更目录使用的 schema 版本与创建时间，标记这是一个已归档的 evaluator 持久 agent 改造变更。",
+      "tags": [
+        "configuration",
+        "openspec",
+        "metadata"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/proposal.md",
+      "type": "document",
+      "name": "proposal.md",
+      "filePath": "openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/proposal.md",
+      "summary": "变更提案文档，阐述为何将 evaluator 改造为持久 agent（Why）、具体改动项（What Changes）、新增与修改的能力（Capabilities）及影响范围。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "proposal",
+        "entry-point"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/design.md",
+      "type": "document",
+      "name": "design.md",
+      "filePath": "openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/design.md",
+      "summary": "设计决策文档，记录 D1-D5 五项核心决策（持久 agent + 每轮 reset 会话、有界压缩投喂、agents.update 钉模型、per-query 内联 evaluate 解析、eval_step 节流），并列出风险权衡与探测结论。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "design",
+        "architecture"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/tasks.md",
+      "type": "document",
+      "name": "tasks.md",
+      "filePath": "openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/tasks.md",
+      "summary": "实施任务清单，按七大工作项拆解变更落地步骤：配置模型重构、钉死裁判模型、持久 agent + 每轮 reset、有界压缩投喂、评审频率节流、复杂任务实验支撑、校验与文档。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "tasks",
+        "checklist"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/RESULTS.md",
+      "type": "document",
+      "name": "RESULTS.md",
+      "filePath": "openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/RESULTS.md",
+      "summary": "实验与验证结果文档，记录连真网关（gemini-3-flash-preview）下的探测结论、防锚定/reset 验证、反幻觉未退化 e2e、闭环集成及 eval_step 对比等实测数据。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "experiment-results",
+        "validation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/.openspec.yaml",
+      "type": "config",
+      "name": ".openspec.yaml",
+      "filePath": "openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/.openspec.yaml",
+      "summary": "该 OpenSpec 变更目录的元数据配置，记录 schema 版本与创建时间，标识 evaluator-rubric-scoring 变更包。",
+      "tags": [
+        "configuration",
+        "openspec",
+        "metadata"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/proposal.md",
+      "type": "document",
+      "name": "proposal.md",
+      "filePath": "openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/proposal.md",
+      "summary": "evaluator-rubric-scoring 变更的提案文档，阐述将评分从「LLM 主观拍 completion」升级为「结构化 rubric + 确定性公式聚合」的动机、变更清单（含多处 BREAKING）、新增/修改的能力与代码影响面。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "proposal",
+        "evaluator",
+        "scoring"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "OpenSpec proposal 采用 Why / What Changes / Capabilities / Impact 的标准分节，作为变更包的锚点文档。"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/design.md",
+      "type": "document",
+      "name": "design.md",
+      "filePath": "openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/design.md",
+      "summary": "变更的设计决策文档，通过 D1~D8 八条决策记录 rubric 由 evaluator-agent 判 0/1、ScoringSpec 聚合器、config 字段别名归一、JSON-Pointer 解引用、轨迹落盘及 map 模式源路径解析等关键取舍。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "design",
+        "architecture-decision",
+        "evaluator"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "设计文档以编号决策（D1-D8）+ Risks / Migration Plan / Open Questions 组织，便于评审逐条追溯。"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/tasks.md",
+      "type": "document",
+      "name": "tasks.md",
+      "filePath": "openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/tasks.md",
+      "summary": "变更的实施任务清单，分 7 组覆盖结构化 rubric 与评分模型、config 解析适配、evaluator 二值化输出、profile_file 收敛、轨迹落盘、端到端验证与补充修订。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "tasks",
+        "checklist",
+        "implementation-plan"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/user_prompt.txt",
+      "type": "document",
+      "name": "user_prompt.txt",
+      "filePath": "openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/user_prompt.txt",
+      "summary": "催生该变更的原始用户对话记录，分四轮澄清 RL 评测任务的配置组成（oracle_ref/rubrics_ref/scoring）、rubric 二值化、gate 一票否决公式、profile_file 读取与轨迹 tool_call 为空等需求。",
+      "tags": [
+        "documentation",
+        "requirements",
+        "conversation-log",
+        "evaluator"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/.openspec.yaml",
+      "type": "config",
+      "name": ".openspec.yaml",
+      "filePath": "openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/.openspec.yaml",
+      "summary": "OpenSpec 变更元数据文件，声明本变更目录使用的 schema 版本与创建日期，用于标识 2026-06-29 的“任务期间隔离 oracle/rubrics”变更。",
+      "tags": [
+        "configuration",
+        "openspec",
+        "metadata"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/proposal.md",
+      "type": "document",
+      "name": "proposal.md",
+      "filePath": "openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/proposal.md",
+      "summary": "变更提案文档，阐述在任务执行期间隔离 oracle 与 rubrics 答案文件的动因（Why）、变更内容（What Changes）、涉及的新增/修改能力以及影响范围。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "proposal",
+        "entry-point"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/design.md",
+      "type": "document",
+      "name": "design.md",
+      "filePath": "openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/design.md",
+      "summary": "技术设计文档，记录任务期间隔离 oracle/rubrics 的六项关键决策（读盘时留存原始字节、原字节写回还原、per-query 作用域删/还原、整文件删除、开关置于 evaluate 块、best-effort 不抛错）及风险权衡与迁移方案。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "design",
+        "decision-record"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/tasks.md",
+      "type": "document",
+      "name": "tasks.md",
+      "filePath": "openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/tasks.md",
+      "summary": "实现任务清单，将变更拆分为三组任务：Vault 字段与原始字节留存、per-query 的删除与还原、以及验证。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "task-list",
+        "checklist"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/.openspec.yaml",
+      "type": "config",
+      "name": ".openspec.yaml",
+      "filePath": "openspec/changes/archive/2026-06-30-toolcall-capture-via-history/.openspec.yaml",
+      "summary": "OpenSpec 变更目录的元数据配置,声明 schema 版本与创建时间,标识本变更为一次规范化改动。",
+      "tags": [
+        "configuration",
+        "openspec",
+        "metadata",
+        "change-manifest"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/proposal.md",
+      "type": "document",
+      "name": "proposal.md",
+      "filePath": "openspec/changes/archive/2026-06-30-toolcall-capture-via-history/proposal.md",
+      "summary": "变更提案:说明落盘轨迹每轮 tool_calls 恒空的根因(OC 服务端自主 agent 工具事件不经实时流),提出改走 chat_history 采集并在 evaluator 侧加空证据兜底,同时列出对 openclaw_automation.py、trajectory.py、evaluator.py 的影响。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "proposal",
+        "trajectory-capture",
+        "bugfix"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/design.md",
+      "type": "document",
+      "name": "design.md",
+      "filePath": "openspec/changes/archive/2026-06-30-toolcall-capture-via-history/design.md",
+      "summary": "设计文档:给出六项决策(D1-D6),核心是数据源选 chat_history 而非事件流/回调、每轮增量截取配对 tool_use/tool_result、解析在 harness 侧解耦、用被测 agent 的 session_key 寻址、evaluator 兜底防误判、探针前置验证,并列出风险、迁移计划与开放问题。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "design",
+        "technical-decision",
+        "trajectory-capture"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/tasks.md",
+      "type": "document",
+      "name": "tasks.md",
+      "filePath": "openspec/changes/archive/2026-06-30-toolcall-capture-via-history/tasks.md",
+      "summary": "实施任务清单:分六步覆盖探针验证(前置门禁)、trajectory-capture 的工具调用解析、openclaw_automation.py 每轮采集接线、trajectory-evaluation 的 evaluator 兜底防误判、验证与回归、文档与归档。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "tasks",
+        "checklist",
+        "implementation-plan"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:_fix_userdir.py",
+      "type": "file",
+      "name": "_fix_userdir.py",
+      "filePath": "_fix_userdir.py",
+      "summary": "根目录一次性修补脚本，用于将任务配置里的 user_dir 字段批量置空或修正，配合评估器隔离逻辑使用。",
+      "tags": [
+        "script",
+        "utility",
+        "config-patch",
+        "one-off"
+      ],
+      "complexity": "simple",
+      "languageNotes": "纯顶层语句脚本，无函数定义，直接执行即完成修补。"
+    },
+    {
+      "id": "file:_patch_tasks.py",
+      "type": "file",
+      "name": "_patch_tasks.py",
+      "filePath": "_patch_tasks.py",
+      "summary": "根目录任务配置批量修补脚本，读写 JSON 任务文件并根据 evaluate 块生成自定义 rubrics，修改前自动备份。",
+      "tags": [
+        "script",
+        "utility",
+        "config-patch",
+        "rubric",
+        "serialization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:_run_dcb.py",
+      "type": "file",
+      "name": "_run_dcb.py",
+      "filePath": "_run_dcb.py",
+      "summary": "根目录 dailyclawbench 运行入口脚本，装配运行配置并触发单个任务的端到端跑批。",
+      "tags": [
+        "script",
+        "entry-point",
+        "runner",
+        "one-off"
+      ],
+      "complexity": "simple",
+      "languageNotes": "纯顶层语句脚本，无函数定义，作为快捷运行入口直接执行。"
+    },
+    {
+      "id": "file:.understand-anything/.understandignore",
+      "type": "file",
+      "name": ".understandignore",
+      "filePath": ".understand-anything/.understandignore",
+      "summary": "Understand-Anything 分析工具的忽略规则文件，声明代码知识图谱扫描时应跳过的路径。",
+      "tags": [
+        "configuration",
+        "ignore-rules",
+        "tooling"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.understand-anything/config.json",
+      "type": "config",
+      "name": "config.json",
+      "filePath": ".understand-anything/config.json",
+      "summary": "Understand-Anything 工具配置，指定知识图谱输出语言等运行参数。",
+      "tags": [
+        "configuration",
+        "tooling",
+        "output-language"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:0701_任务管线产物标准模板/task_configs/08_科研助手_描述统计相关分析_q1.json",
+      "type": "config",
+      "name": "08_科研助手_描述统计相关分析_q1.json",
+      "filePath": "0701_任务管线产物标准模板/task_configs/08_科研助手_描述统计相关分析_q1.json",
+      "summary": "科研助手描述统计与相关分析任务的标准配置模板，声明 system、input_dir、agents、queries、simulator_config 与 Harness_Type 等字段。",
+      "tags": [
+        "configuration",
+        "task-config",
+        "schema-template",
+        "simulator"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:agents/audit_assistant/SOUL.md",
+      "type": "document",
+      "name": "SOUL.md",
+      "filePath": "agents/audit_assistant/SOUL.md",
+      "summary": "财务审计助手 agent 的人格与能力定义文档，涵盖核心定位、审计底稿分析、财税政策研究、数据处理与语言风格。",
+      "tags": [
+        "documentation",
+        "agent-persona",
+        "audit",
+        "prompt"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:agents/audit_assistant/USER.md",
+      "type": "document",
+      "name": "USER.md",
+      "filePath": "agents/audit_assistant/USER.md",
+      "summary": "财务审计助手场景下的用户画像文档，描述用户专业背景、当前工作上下文、文件组织结构与沟通偏好。",
+      "tags": [
+        "documentation",
+        "user-profile",
+        "audit",
+        "context"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:agents/news_reader/SOUL.md",
+      "type": "document",
+      "name": "SOUL.md",
+      "filePath": "agents/news_reader/SOUL.md",
+      "summary": "news_reader 阅读分析助手 agent 的人格文档，定义论文阅读、内容分析、学术指导能力与分析框架。",
+      "tags": [
+        "documentation",
+        "agent-persona",
+        "reading",
+        "prompt"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:agents/news_reader/USER.md",
+      "type": "document",
+      "name": "USER.md",
+      "filePath": "agents/news_reader/USER.md",
+      "summary": "news_reader 场景的用户画像文档，描述用户学习背景、当前阅读任务、分析目标与预期成果。",
+      "tags": [
+        "documentation",
+        "user-profile",
+        "reading",
+        "context"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:agents/paper_reader/SOUL.md",
+      "type": "document",
+      "name": "SOUL.md",
+      "filePath": "agents/paper_reader/SOUL.md",
+      "summary": "paper_reader 论文阅读分析助手 agent 的人格文档，定义论文阅读、内容分析、学术指导能力与分析框架。",
+      "tags": [
+        "documentation",
+        "agent-persona",
+        "reading",
+        "prompt"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:agents/paper_reader/USER.md",
+      "type": "document",
+      "name": "USER.md",
+      "filePath": "agents/paper_reader/USER.md",
+      "summary": "paper_reader 场景的用户画像文档，描述用户学习背景、阅读材料、分析目标与沟通方式。",
+      "tags": [
+        "documentation",
+        "user-profile",
+        "reading",
+        "context"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:agents/TOOLS.md",
+      "type": "document",
+      "name": "TOOLS.md",
+      "filePath": "agents/TOOLS.md",
+      "summary": "所有 agent 共享的工具使用指南，重点约束联网搜索与网页读取的正确调用方式并给出示例。",
+      "tags": [
+        "documentation",
+        "tool-guide",
+        "agent",
+        "shared"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:openspec/changes/align-task-config-standard/specs/task-config-schema/spec.md",
+      "type": "document",
+      "name": "spec.md",
+      "filePath": "openspec/changes/align-task-config-standard/specs/task-config-schema/spec.md",
+      "summary": "任务配置标准对齐的 OpenSpec 规格，定义配置分目录布局、is_noise 派生规则、scoring_ref 显式引用、agent 去 role 与 Harness_Type 占位字段等需求。",
+      "tags": [
+        "documentation",
+        "spec",
+        "task-config",
+        "openspec"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/specs/trajectory-capture/spec.md",
+      "type": "document",
+      "name": "spec.md",
+      "filePath": "openspec/changes/archive/2026-06-23-add-trajectory-evaluator/specs/trajectory-capture/spec.md",
+      "summary": "归档的轨迹捕获规格，要求逐轮捕获带证据的执行记录、以磁盘真相校正文件证据并标注证据完整性。",
+      "tags": [
+        "documentation",
+        "spec",
+        "trajectory",
+        "openspec",
+        "archived"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/specs/trajectory-evaluation/spec.md",
+      "type": "document",
+      "name": "spec.md",
+      "filePath": "openspec/changes/archive/2026-06-23-add-trajectory-evaluator/specs/trajectory-evaluation/spec.md",
+      "summary": "归档的轨迹评估规格，定义每轮由独立 evaluator 评估、基于真实证据核验、无状态独立投喂与结构化带引证落盘等需求。",
+      "tags": [
+        "documentation",
+        "spec",
+        "evaluation",
+        "openspec",
+        "archived"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/specs/simulator-session-isolation/spec.md",
+      "type": "document",
+      "name": "spec.md",
+      "filePath": "openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/specs/simulator-session-isolation/spec.md",
+      "summary": "归档的 simulator 会话隔离规格，要求 user_simulator 对话记忆按 session 隔离且隔离下暴露歧义而非靠泄露蒙混。",
+      "tags": [
+        "documentation",
+        "spec",
+        "session-isolation",
+        "openspec",
+        "archived"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/specs/trajectory-evaluation/spec.md",
+      "type": "document",
+      "name": "spec.md",
+      "filePath": "openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/specs/trajectory-evaluation/spec.md",
+      "summary": "归档的轨迹评估修订规格，将评估输出结构化需求扩展为含 rubric 时输出逐条质检结果、无 rubric 时质检为空。",
+      "tags": [
+        "documentation",
+        "spec",
+        "evaluation",
+        "rubric",
+        "archived"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/specs/trajectory-evaluation/spec.md",
+      "type": "document",
+      "name": "spec.md",
+      "filePath": "openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/specs/trajectory-evaluation/spec.md",
+      "summary": "归档的 rubric 质检规格，定义 rubric 随 query 传入并跨轮冻结、evaluator 逐条质检产物、rubric 原文不进入 simulator 且回流受开关控制。",
+      "tags": [
+        "documentation",
+        "spec",
+        "evaluation",
+        "rubric",
+        "archived"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/config_eval_exp.json",
+      "type": "config",
+      "name": "config_eval_exp.json",
+      "filePath": "openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/config_eval_exp.json",
+      "summary": "归档的 evaluator 持久化改造实验配置，声明 agents、queries、gateway 连接、simulator_config 与 user_max_turn 等实验参数。",
+      "tags": [
+        "configuration",
+        "experiment",
+        "evaluator",
+        "archived"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "type": "file",
+      "name": "eval_step_sweep.py",
+      "filePath": "openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "summary": "归档的评审步长扫描实验脚本，构造多轮 trajectory 并按不同 eval_step 触发 Evaluator 评估，度量耗时、prompt 规模与完成度并落盘结果。",
+      "tags": [
+        "script",
+        "experiment",
+        "evaluator",
+        "benchmark",
+        "archived"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/user_prompt.txt",
+      "type": "document",
+      "name": "user_prompt.txt",
+      "filePath": "openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/user_prompt.txt",
+      "summary": "归档实验用的用户提示词样本文本，供 evaluator 持久化改造扫描脚本作为输入语料使用。",
+      "tags": [
+        "documentation",
+        "prompt",
+        "fixture",
+        "archived"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/specs/trajectory-evaluation/spec.md",
+      "type": "document",
+      "name": "spec.md",
+      "filePath": "openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/specs/trajectory-evaluation/spec.md",
+      "summary": "归档的 evaluator 持久化改造规格，定义按评审点触发评估、复用持久 evaluator agent、有界压缩投喂、裁判模型钉死与评审频率可配等需求。",
+      "tags": [
+        "documentation",
+        "spec",
+        "evaluation",
+        "persistent-agent",
+        "archived"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/specs/trajectory-evaluation/spec.md",
+      "type": "document",
+      "name": "spec.md",
+      "filePath": "openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/specs/trajectory-evaluation/spec.md",
+      "summary": "归档的 rubric 评分规格，定义确定性评分聚合 Scorer 算出 completion、按桶加权与 gate 归零、用户画像按 profile_file 装配及 rubric 逐条 0/1 质检等需求。",
+      "tags": [
+        "documentation",
+        "spec",
+        "evaluation",
+        "scoring",
+        "archived"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/specs/trajectory-persistence/spec.md",
+      "type": "document",
+      "name": "spec.md",
+      "filePath": "openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/specs/trajectory-persistence/spec.md",
+      "summary": "归档的轨迹持久化规格，要求每条 query 完整轨迹落盘保留、含逐轮证据与产物指针，且评分结果随轨迹一并落盘并标识终局。",
+      "tags": [
+        "documentation",
+        "spec",
+        "trajectory",
+        "persistence",
+        "archived"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:_patch_tasks.py:build_custom_rubrics",
+      "type": "function",
+      "name": "build_custom_rubrics",
+      "filePath": "_patch_tasks.py",
+      "lineRange": [
+        44,
+        61
+      ],
+      "summary": "从 evaluate 块读取配置并构造自定义 rubrics 列表，含权重解析与逐条追加。",
+      "tags": [
+        "utility",
+        "rubric",
+        "config-patch"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py:make_turn",
+      "type": "function",
+      "name": "make_turn",
+      "filePath": "openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "lineRange": [
+        31,
+        37
+      ],
+      "summary": "工厂函数，用给定内容、工具与文件证据构造一个 TurnRecord，供扫描脚本合成多轮轨迹。",
+      "tags": [
+        "factory",
+        "trajectory",
+        "test-fixture"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py:run_one",
+      "type": "function",
+      "name": "run_one",
+      "filePath": "openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "lineRange": [
+        61,
+        85
+      ],
+      "summary": "对单个 eval_step 步长执行一次扫描，逐轮累积 trajectory 并触发 Evaluator 评估，统计耗时、prompt 字符数与完成度。",
+      "tags": [
+        "experiment",
+        "evaluator",
+        "benchmark"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "lineRange": [
+        88,
+        107
+      ],
+      "summary": "扫描脚本入口，构建 OpenClaw 客户端并钉死裁判模型，遍历各步长调用 run_one 并将结果汇总落盘。",
+      "tags": [
+        "entry-point",
+        "experiment",
+        "runner"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/specs/evaluation-file-isolation/spec.md",
+      "type": "document",
+      "name": "spec.md (archived: evaluation-file-isolation)",
+      "filePath": "openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/specs/evaluation-file-isolation/spec.md",
+      "summary": "已归档的变更 delta 规范，定义评估文件隔离能力的新增需求：解析时留存 oracle/rubrics 原始字节、由配置开关控制隔离、任务执行期间从磁盘隔离被引用文件、结束后尽力还原。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "评估隔离",
+        "delta-spec",
+        "已归档"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/specs/trajectory-capture/spec.md",
+      "type": "document",
+      "name": "spec.md (archived: trajectory-capture)",
+      "filePath": "openspec/changes/archive/2026-06-30-toolcall-capture-via-history/specs/trajectory-capture/spec.md",
+      "summary": "已归档的变更 delta 规范，将工具调用证据的捕获从工具沙箱改为从 OC 会话历史解析，含逐轮从会话历史捕获、按序累积、仅截取本轮新增等场景。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "轨迹采集",
+        "delta-spec",
+        "已归档"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/specs/trajectory-evaluation/spec.md",
+      "type": "document",
+      "name": "spec.md (archived: trajectory-evaluation)",
+      "filePath": "openspec/changes/archive/2026-06-30-toolcall-capture-via-history/specs/trajectory-evaluation/spec.md",
+      "summary": "已归档的变更 delta 规范，修订轨迹评估需求，强调基于真实证据并用工具核验，明确空 tool_calls 不得被当作造假证据。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "轨迹评估",
+        "delta-spec",
+        "已归档"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:openspec/config.yaml",
+      "type": "config",
+      "name": "config.yaml",
+      "filePath": "openspec/config.yaml",
+      "summary": "OpenSpec 项目根配置，声明 schema 及规范/变更目录结构，统管 openspec/specs 与 openspec/changes 下的能力规范。",
+      "tags": [
+        "configuration",
+        "openspec",
+        "schema",
+        "元配置"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:openspec/specs/evaluation-file-isolation/spec.md",
+      "type": "document",
+      "name": "spec.md (evaluation-file-isolation)",
+      "filePath": "openspec/specs/evaluation-file-isolation/spec.md",
+      "summary": "评估文件隔离能力的主规范：任务执行期间从磁盘隔离 oracle/rubrics 以防被测 agent 偷看答案，解析时留存原始字节，由配置开关控制，结束后尽力还原。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "评估隔离",
+        "防作弊",
+        "能力规范"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/specs/simulator-session-isolation/spec.md",
+      "type": "document",
+      "name": "spec.md (simulator-session-isolation)",
+      "filePath": "openspec/specs/simulator-session-isolation/spec.md",
+      "summary": "模拟器会话隔离能力规范：user_simulator 对话记忆按 session 隔离，同 session 续聊保留记忆、跨 session 不泄露，用逻辑 session_name 键控并在无解指代时据实暴露歧义。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "会话隔离",
+        "模拟器",
+        "能力规范"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:openspec/specs/trajectory-capture/spec.md",
+      "type": "document",
+      "name": "spec.md (trajectory-capture)",
+      "filePath": "openspec/specs/trajectory-capture/spec.md",
+      "summary": "轨迹采集能力主规范：逐轮从 OC 会话历史解析工具调用证据、以磁盘真相校正文件证据、标注证据完整性，且证据缺失不得被当作负面证据。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "轨迹采集",
+        "证据取证",
+        "能力规范"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:openspec/specs/trajectory-evaluation/spec.md",
+      "type": "document",
+      "name": "spec.md (trajectory-evaluation)",
+      "filePath": "openspec/specs/trajectory-evaluation/spec.md",
+      "summary": "轨迹评估能力主规范（最详尽），定义每轮由独立无状态 evaluator 评估并反馈 simulator、基于真实证据核验、rubric 冻结与逐条二值质检、Scorer 确定性评分聚合算 completion、裁判模型钉死等 14 项需求。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "轨迹评估",
+        "评分聚合",
+        "能力规范"
+      ],
+      "complexity": "complex",
+      "languageNotes": "本批最大规范文件（249 行 / 61 节），是评估子系统的权威契约来源。"
+    },
+    {
+      "id": "document:openspec/specs/trajectory-persistence/spec.md",
+      "type": "document",
+      "name": "spec.md (trajectory-persistence)",
+      "filePath": "openspec/specs/trajectory-persistence/spec.md",
+      "summary": "轨迹持久化能力规范：每条 query 的完整轨迹（含逐轮证据与产物指针）落盘保留、不随进程退出丢失，评分结果随轨迹一并落盘并标识终局评审点。",
+      "tags": [
+        "documentation",
+        "openspec",
+        "轨迹持久化",
+        "落盘",
+        "能力规范"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:scripts/cleanup_map.py",
+      "type": "file",
+      "name": "cleanup_map.py",
+      "filePath": "scripts/cleanup_map.py",
+      "summary": "运维脚本：读取工作区映射文件（map.json），据其清理（删除目录/文件）已生成的目标产物，支持 dry-run 预览。",
+      "tags": [
+        "script",
+        "运维",
+        "清理",
+        "工作区管理"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/cleanup_map.py:cleanup",
+      "type": "function",
+      "name": "cleanup",
+      "filePath": "scripts/cleanup_map.py",
+      "lineRange": [
+        20,
+        60
+      ],
+      "summary": "遍历映射文件中的目标路径，逐项删除对应目录或文件，dry_run 为真时仅打印而不实际删除。",
+      "tags": [
+        "清理",
+        "文件删除",
+        "dry-run"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:scripts/fix_hard_tasks.py",
+      "type": "file",
+      "name": "fix_hard_tasks.py",
+      "filePath": "scripts/fix_hard_tasks.py",
+      "summary": "批量修复 hard 任务配置脚本：为 q1.json 补齐 skill_dir、user_dir、evaluator agent 等字段（fix_q1_A / fix_q1_B 两套修复路径），修改前自动备份。",
+      "tags": [
+        "script",
+        "配置修复",
+        "批处理",
+        "hard-tasks"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:scripts/fix_hard_tasks.py:fix_q1_A",
+      "type": "function",
+      "name": "fix_q1_A",
+      "filePath": "scripts/fix_hard_tasks.py",
+      "lineRange": [
+        71,
+        87
+      ],
+      "summary": "修复路径 A：加载 q1 配置，修正 skill_dir、user_dir 并按需回补字段，变更时先备份再写回。",
+      "tags": [
+        "配置修复",
+        "q1",
+        "备份"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/fix_hard_tasks.py:fix_q1_B",
+      "type": "function",
+      "name": "fix_q1_B",
+      "filePath": "scripts/fix_hard_tasks.py",
+      "lineRange": [
+        90,
+        119
+      ],
+      "summary": "修复路径 B：为 q1 追加 evaluator agent、按相对路径重算 input/user 目录并回补缺失字段，变更时先备份再写回。",
+      "tags": [
+        "配置修复",
+        "q1",
+        "evaluator",
+        "备份"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/fix_hard_tasks.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/fix_hard_tasks.py",
+      "lineRange": [
+        122,
+        145
+      ],
+      "summary": "入口：遍历 dailyclawbench 与 hard 任务目录下的 q1 配置，分别套用 fix_q1_A / fix_q1_B 修复并汇总统计。",
+      "tags": [
+        "entry-point",
+        "批处理",
+        "配置修复"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:scripts/generate_configs.py",
+      "type": "file",
+      "name": "generate_configs.py",
+      "filePath": "scripts/generate_configs.py",
+      "summary": "配置生成脚本：从 input 目录逐个话题读取 user_queries.json 与 profile 文件，按模板批量生成单条 query 的自动化运行配置 JSON。",
+      "tags": [
+        "script",
+        "配置生成",
+        "批处理",
+        "cli"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:scripts/generate_configs.py:generate_single_config",
+      "type": "function",
+      "name": "generate_single_config",
+      "filePath": "scripts/generate_configs.py",
+      "lineRange": [
+        30,
+        84
+      ],
+      "summary": "按给定 agent/query 索引、skills、profile、workspace、模型与网关连接参数等装配并返回一份完整的单条自动化运行配置字典。",
+      "tags": [
+        "配置生成",
+        "模板装配",
+        "factory"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/generate_configs.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/generate_configs.py",
+      "lineRange": [
+        87,
+        160
+      ],
+      "summary": "入口：解析命令行参数，遍历 input 目录各话题文件夹，逐条 query 调用 generate_single_config 并写出配置文件。",
+      "tags": [
+        "entry-point",
+        "cli",
+        "argparse",
+        "批处理"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:scripts/pairing_fix.py",
+      "type": "file",
+      "name": "pairing_fix.py",
+      "filePath": "scripts/pairing_fix.py",
+      "summary": "SDK 配对修复脚本：从 paired.json 递归找出 operator token 并写入 device-auth.json，解决 OpenClaw SDK 报 pairing required 的问题，修改前备份原文件。",
+      "tags": [
+        "script",
+        "运维",
+        "sdk-配对",
+        "认证修复"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/pairing_fix.py:find_operator",
+      "type": "function",
+      "name": "find_operator",
+      "filePath": "scripts/pairing_fix.py",
+      "lineRange": [
+        22,
+        33
+      ],
+      "summary": "递归遍历 paired.json 的嵌套结构，定位并返回携带 operator token 的节点。",
+      "tags": [
+        "递归查找",
+        "token",
+        "解析"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/pairing_fix.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/pairing_fix.py",
+      "lineRange": [
+        36,
+        71
+      ],
+      "summary": "入口：读取 paired.json 提取 operator token，备份并写入 device-auth.json 以恢复 SDK 配对。",
+      "tags": [
+        "entry-point",
+        "sdk-配对",
+        "认证修复"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:scripts/patch_eval_step.py",
+      "type": "file",
+      "name": "patch_eval_step.py",
+      "filePath": "scripts/patch_eval_step.py",
+      "summary": "批量补丁脚本：为 q1.json / user_queries.json 的 evaluate 块补齐 eval_step 字段并在需要时从备份还原 user_queries，遍历 dailyclawbench 与 hard 任务。",
+      "tags": [
+        "script",
+        "配置修复",
+        "批处理",
+        "eval-step"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:scripts/patch_eval_step.py:patch_q1",
+      "type": "function",
+      "name": "patch_q1",
+      "filePath": "scripts/patch_eval_step.py",
+      "lineRange": [
+        54,
+        63
+      ],
+      "summary": "加载 q1 配置，在其 query 的 evaluate 块内补齐 eval_step 字段并写回。",
+      "tags": [
+        "配置修复",
+        "q1",
+        "eval-step"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/patch_eval_step.py:patch_uq",
+      "type": "function",
+      "name": "patch_uq",
+      "filePath": "scripts/patch_eval_step.py",
+      "lineRange": [
+        66,
+        78
+      ],
+      "summary": "加载 user_queries 配置，遍历各条目在 evaluate 块内补齐 eval_step 字段并写回。",
+      "tags": [
+        "配置修复",
+        "user-queries",
+        "eval-step"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/patch_eval_step.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/patch_eval_step.py",
+      "lineRange": [
+        81,
+        112
+      ],
+      "summary": "入口：收集 dailyclawbench 与 hard 任务的 q1 路径，逐个还原 user_queries 并套用 patch_q1 / patch_uq 补丁。",
+      "tags": [
+        "entry-point",
+        "批处理",
+        "配置修复"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:scripts/probe_chat_history.py",
+      "type": "file",
+      "name": "probe_chat_history.py",
+      "filePath": "scripts/probe_chat_history.py",
+      "summary": "探针脚本：连接 OpenClaw 网关，创建 agent 执行一次任务后拉取 chat_history，落盘并统计消息中的工具调用步骤，用于验证从会话历史取证的可行性。",
+      "tags": [
+        "script",
+        "探针",
+        "会话历史",
+        "调试"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/probe_chat_history.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/probe_chat_history.py",
+      "lineRange": [
+        19,
+        64
+      ],
+      "summary": "异步入口：连接网关、创建并执行 agent、拉取 gateway.chat_history 落盘并逐条统计工具证据。",
+      "tags": [
+        "entry-point",
+        "async",
+        "会话历史",
+        "探针"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:scripts/run_rl14_batch.py",
+      "type": "file",
+      "name": "run_rl14_batch.py",
+      "filePath": "scripts/run_rl14_batch.py",
+      "summary": "批量运行脚本：驱动 RL14 批次任务的执行入口（顶层脚本，无显式函数定义）。",
+      "tags": [
+        "script",
+        "批处理",
+        "运行入口"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:scripts/scan_hard_tasks.py",
+      "type": "file",
+      "name": "scan_hard_tasks.py",
+      "filePath": "scripts/scan_hard_tasks.py",
+      "summary": "巡检脚本：扫描 hard 任务 q1 配置，校验 evaluator、oracle_ref/user_queries 存在性、user_dir 路径前缀、maxturn 与自定义项等，汇总问题分类报表。",
+      "tags": [
+        "script",
+        "巡检",
+        "配置校验",
+        "hard-tasks"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:scripts/scan_hard_tasks.py:jp",
+      "type": "function",
+      "name": "jp",
+      "filePath": "scripts/scan_hard_tasks.py",
+      "lineRange": [
+        38,
+        49
+      ],
+      "summary": "轻量 JSON Pointer 解析器：按 RFC6901 转义规则拆分指针并逐段解引用嵌套 JSON 结构。",
+      "tags": [
+        "json-pointer",
+        "解引用",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/scan_hard_tasks.py:scan_q1",
+      "type": "function",
+      "name": "scan_q1",
+      "filePath": "scripts/scan_hard_tasks.py",
+      "lineRange": [
+        52,
+        87
+      ],
+      "summary": "扫描单个 q1 配置：检查 evaluator/evaluate 块、oracle_ref 或 rubrics_ref 指向的 user_queries 存在性、skill_dir 前缀与 user_dir 等并返回校验结果行。",
+      "tags": [
+        "配置校验",
+        "巡检",
+        "q1"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:scripts/scan_hard_tasks.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/scan_hard_tasks.py",
+      "lineRange": [
+        90,
+        138
+      ],
+      "summary": "入口：遍历 dailyclawbench 与 hard 任务目录逐个 scan_q1，打印逐行状态表并按问题类型汇总统计。",
+      "tags": [
+        "entry-point",
+        "巡检",
+        "报表"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:test/example_test.py",
+      "type": "file",
+      "name": "example_test.py",
+      "filePath": "test/example_test.py",
+      "summary": "端到端示例测试：验证项目模块导入、配置加载与网关连通性（含 check_http_health 健康检查），作为环境自检与冒烟测试。",
+      "tags": [
+        "test",
+        "冒烟测试",
+        "环境自检",
+        "网关连通"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:test/example_test.py:test_imports",
+      "type": "function",
+      "name": "test_imports",
+      "filePath": "test/example_test.py",
+      "lineRange": [
+        49,
+        80
+      ],
+      "summary": "测试项目关键模块能否成功导入，逐个打印导入结果并报告失败项。",
+      "tags": [
+        "test",
+        "导入检查"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:test/example_test.py:test_config_loading",
+      "type": "function",
+      "name": "test_config_loading",
+      "filePath": "test/example_test.py",
+      "lineRange": [
+        83,
+        114
+      ],
+      "summary": "测试 configs 目录下的配置文件能否被正确定位与 JSON 解析，并统计 agents/queries 数量。",
+      "tags": [
+        "test",
+        "配置加载"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:test/example_test.py:test_gateway_connection",
+      "type": "function",
+      "name": "test_gateway_connection",
+      "filePath": "test/example_test.py",
+      "lineRange": [
+        117,
+        157
+      ],
+      "summary": "异步测试网关连通性，调用 check_http_health 做健康检查并报告连接状态。",
+      "tags": [
+        "test",
+        "async",
+        "网关连通",
+        "健康检查"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:test/example_test.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "test/example_test.py",
+      "lineRange": [
+        160,
+        187
+      ],
+      "summary": "测试入口：依次运行项目信息展示、导入、配置加载与网关连通测试并汇总结果。",
+      "tags": [
+        "entry-point",
+        "test",
+        "测试编排"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:test/test_sdk.py",
+      "type": "file",
+      "name": "test_sdk.py",
+      "filePath": "test/test_sdk.py",
+      "summary": "最小 SDK 冒烟测试：连接 OpenClaw 客户端、列出 agent 并对一个 agent 执行一次调用以验证 SDK 可用。",
+      "tags": [
+        "test",
+        "冒烟测试",
+        "sdk"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:utils/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "utils/__init__.py",
+      "summary": "utils 包的初始化文件（空），将 utils 目录标记为 Python 包。",
+      "tags": [
+        "entry-point",
+        "package-init",
+        "barrel"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:utils/connection.py",
+      "type": "file",
+      "name": "connection.py",
+      "filePath": "utils/connection.py",
+      "summary": "网关连接工具模块：提供带自动重连与退避的 ResilientGateway，以及 HTTP 健康检查、OpenClaw 客户端构建与网关重建等工具函数，是自动化系统与 OpenClaw 网关通信的底座。",
+      "tags": [
+        "utility",
+        "网关连接",
+        "重连退避",
+        "websocket",
+        "service"
+      ],
+      "complexity": "complex",
+      "languageNotes": "大量 asyncio 事件/锁与 future 管理，实现断线重连、心跳 tick 监控与消息路由。"
+    },
+    {
+      "id": "class:utils/connection.py:ResilientGateway",
+      "type": "class",
+      "name": "ResilientGateway",
+      "filePath": "utils/connection.py",
+      "lineRange": [
+        46,
+        350
+      ],
+      "summary": "具备断线重连、指数退避、心跳监控与消息路由的弹性网关封装，屏蔽底层 WebSocket 抖动，向上提供 call/subscribe/ensure_connected 等稳定接口。",
+      "tags": [
+        "service",
+        "网关连接",
+        "重连退避",
+        "async",
+        "singleton"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:utils/connection.py:check_http_health",
+      "type": "function",
+      "name": "check_http_health",
+      "filePath": "utils/connection.py",
+      "lineRange": [
+        370,
+        401
+      ],
+      "summary": "对网关 HTTP 基址发起健康检查请求，在超时内返回连通性与状态信息。",
+      "tags": [
+        "网关连接",
+        "健康检查",
+        "http"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:utils/connection.py:build_openclaw_client",
+      "type": "function",
+      "name": "build_openclaw_client",
+      "filePath": "utils/connection.py",
+      "lineRange": [
+        408,
+        438
+      ],
+      "summary": "按网关 WS 地址、api_key 与超时构建 OpenClaw 客户端实例，装配 ResilientGateway 作为底层传输。",
+      "tags": [
+        "网关连接",
+        "factory",
+        "客户端构建"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:utils/connection.py:rebuild_gateway",
+      "type": "function",
+      "name": "rebuild_gateway",
+      "filePath": "utils/connection.py",
+      "lineRange": [
+        441,
+        488
+      ],
+      "summary": "在既有客户端上重建底层网关连接，用于故障后重置传输层。",
+      "tags": [
+        "网关连接",
+        "重建",
+        "故障恢复"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:test/test_sdk.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "test/test_sdk.py",
+      "lineRange": [
+        4,
+        22
+      ],
+      "summary": "最小 SDK 冒烟测试的异步主入口：连接 OpenClaw 客户端、列出可用 agent 并对首个 agent 执行一次 hi 调用以验证 SDK 可用。",
+      "tags": [
+        "test",
+        "冒烟测试",
+        "sdk",
+        "async"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:evaluator.py",
+      "target": "class:evaluator.py:Rubric",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:evaluator.py",
+      "target": "class:evaluator.py:ScoringSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:evaluator.py",
+      "target": "class:evaluator.py:Scorer",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:evaluator.py",
+      "target": "class:evaluator.py:EvaluateConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:evaluator.py",
+      "target": "class:evaluator.py:EvaluationResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:evaluator.py",
+      "target": "class:evaluator.py:Evaluator",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:evaluator.py",
+      "target": "function:evaluator.py:_load_prompt_sections",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:evaluator.py",
+      "target": "class:evaluator.py:Rubric",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:evaluator.py",
+      "target": "class:evaluator.py:ScoringSpec",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:evaluator.py",
+      "target": "class:evaluator.py:Scorer",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:evaluator.py",
+      "target": "class:evaluator.py:EvaluateConfig",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:evaluator.py",
+      "target": "class:evaluator.py:EvaluationResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:evaluator.py",
+      "target": "class:evaluator.py:Evaluator",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:evaluator.py",
+      "target": "file:trajectory.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "class:trajectory.py:ToolCallEvidence",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "class:trajectory.py:FileEvidence",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "class:trajectory.py:TurnRecord",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "class:trajectory.py:Trajectory",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "function:trajectory.py:_render_turn",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "function:trajectory.py:_render_turn_compact",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "function:trajectory.py:_normalize_input",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "function:trajectory.py:_block_text",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "function:trajectory.py:extract_tool_calls",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "function:trajectory.py:build_turn_record",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "function:trajectory.py:_resolve_file_evidence",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "function:trajectory.py:capture_file_evidence",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "class:trajectory.py:ToolCallEvidence",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "class:trajectory.py:FileEvidence",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "class:trajectory.py:TurnRecord",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "class:trajectory.py:Trajectory",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "function:trajectory.py:extract_tool_calls",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "function:trajectory.py:build_turn_record",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "function:trajectory.py:capture_file_evidence",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:trajectory.py:build_turn_record",
+      "target": "class:trajectory.py:TurnRecord",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:trajectory.py:extract_tool_calls",
+      "target": "class:trajectory.py:ToolCallEvidence",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:trajectory.py:capture_file_evidence",
+      "target": "function:trajectory.py:_resolve_file_evidence",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:test/test_evaluator.py",
+      "target": "file:evaluator.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:test/test_evaluator.py",
+      "target": "file:trajectory.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:evaluator.py",
+      "target": "file:test/test_evaluator.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:test/test_scoring.py",
+      "target": "file:evaluator.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:evaluator.py",
+      "target": "file:test/test_scoring.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:test/test_trajectory.py",
+      "target": "file:trajectory.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:trajectory.py",
+      "target": "file:test/test_trajectory.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "file:evaluator.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "file:trajectory.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "file:user_simulator.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "file:utils/connection.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/run_eval_experiment.py",
+      "target": "file:openclaw_automation.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:test/test_scoring_ref.py",
+      "target": "file:openclaw_automation.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:test/test_simulator.py",
+      "target": "file:user_simulator.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "class:openclaw_automation.py:InputDirConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "class:openclaw_automation.py:AgentConfigItem",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "class:openclaw_automation.py:QueryItem",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "class:openclaw_automation.py:AutomationConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "class:openclaw_automation.py:WorkspaceManager",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "class:openclaw_automation.py:AgentManager",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "class:openclaw_automation.py:OpenClawAutomation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "class:openclaw_automation.py:ConfigLoader",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "function:openclaw_automation.py:setup_logger",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "function:openclaw_automation.py:create_simulator",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "function:openclaw_automation.py:create_evaluator",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "function:openclaw_automation.py:process_turn",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "function:openclaw_automation.py:execute_queries",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "function:openclaw_automation.py:_resolve_evaluate_refs",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "function:openclaw_automation.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "class:openclaw_automation.py:InputDirConfig",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "class:openclaw_automation.py:AgentConfigItem",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "class:openclaw_automation.py:QueryItem",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "class:openclaw_automation.py:AutomationConfig",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "class:openclaw_automation.py:WorkspaceManager",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "class:openclaw_automation.py:AgentManager",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "class:openclaw_automation.py:OpenClawAutomation",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "class:openclaw_automation.py:ConfigLoader",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:openclaw_automation.py:create_simulator",
+      "target": "class:user_simulator.py:User_simulator",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:openclaw_automation.py:create_evaluator",
+      "target": "file:evaluator.py",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:openclaw_automation.py:process_turn",
+      "target": "file:trajectory.py",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:user_simulator.py",
+      "target": "class:user_simulator.py:User_simulator",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:user_simulator.py",
+      "target": "class:user_simulator.py:User_simulator",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:test/test_scoring_ref.py",
+      "target": "function:test/test_scoring_ref.py:_build_env",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:test/test_simulator.py",
+      "target": "function:test/test_simulator.py:run_test",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "file:test/test_scoring_ref.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:user_simulator.py",
+      "target": "file:test/test_simulator.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:scripts/run_all_hard_tasks.py",
+      "target": "function:scripts/run_all_hard_tasks.py:collect",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/run_all_hard_tasks.py",
+      "target": "function:scripts/run_all_hard_tasks.py:ensure_ubak",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/run_all_hard_tasks.py",
+      "target": "function:scripts/run_all_hard_tasks.py:restore_if_missing",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/run_all_hard_tasks.py",
+      "target": "function:scripts/run_all_hard_tasks.py:parse_log",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/run_all_hard_tasks.py",
+      "target": "function:scripts/run_all_hard_tasks.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/run_all_hard_tasks.py",
+      "target": "function:scripts/run_all_hard_tasks.py:collect",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/run_all_hard_tasks.py",
+      "target": "function:scripts/run_all_hard_tasks.py:ensure_ubak",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/run_all_hard_tasks.py",
+      "target": "function:scripts/run_all_hard_tasks.py:restore_if_missing",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/run_all_hard_tasks.py",
+      "target": "function:scripts/run_all_hard_tasks.py:parse_log",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/run_all_hard_tasks.py",
+      "target": "function:scripts/run_all_hard_tasks.py:main",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/rerun_batchA.py",
+      "target": "function:scripts/rerun_batchA.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/rerun_batchA.py",
+      "target": "function:scripts/rerun_batchA.py:main",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/rerun_batchA.py",
+      "target": "file:scripts/run_all_hard_tasks.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "function:scripts/rerun_batchA.py:main",
+      "target": "function:scripts/run_all_hard_tasks.py:ensure_ubak",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scripts/rerun_batchA.py:main",
+      "target": "function:scripts/run_all_hard_tasks.py:restore_if_missing",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scripts/rerun_batchA.py:main",
+      "target": "function:scripts/run_all_hard_tasks.py:parse_log",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/rerun_batchA_final.py",
+      "target": "function:scripts/rerun_batchA_final.py:read_done",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/rerun_batchA_final.py",
+      "target": "function:scripts/rerun_batchA_final.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/rerun_batchA_final.py",
+      "target": "function:scripts/rerun_batchA_final.py:read_done",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/rerun_batchA_final.py",
+      "target": "function:scripts/rerun_batchA_final.py:main",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/rerun_batchA_final.py",
+      "target": "file:scripts/run_all_hard_tasks.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "function:scripts/rerun_batchA_final.py:main",
+      "target": "function:scripts/run_all_hard_tasks.py:ensure_ubak",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scripts/rerun_batchA_final.py:main",
+      "target": "function:scripts/run_all_hard_tasks.py:restore_if_missing",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scripts/rerun_batchA_final.py:main",
+      "target": "function:scripts/run_all_hard_tasks.py:parse_log",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/user_queries.json",
+      "target": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/oracle.json",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/results_4pilot.json",
+      "target": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/user_queries.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/results_4pilot.json",
+      "target": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/oracle.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/MAP_Windows.json",
+      "target": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/env_config.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/user_profile_08_经济学硕士生_Stats.json",
+      "target": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/user_queries.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/env_config.json",
+      "target": "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/user_queries.json",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "document:system_prompt.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "document:evaluator_user_prompt.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:requirements.txt",
+      "target": "document:README.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:evaluator_user_prompt.md",
+      "target": "document:system_prompt.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/README.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/DESIGN.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/PROJECT_SUMMARY.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/COMPLETE_FIX_SUMMARY.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/FIX_SUMMARY.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/FIX_v1.0.2.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/FIX_v1.0.3.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/README.md",
+      "target": "document:docs/DESIGN.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/README.md",
+      "target": "document:docs/QUICKSTART.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/README.md",
+      "target": "document:docs/PROJECT_SUMMARY.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/PROJECT_SUMMARY.md",
+      "target": "document:docs/DESIGN.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/PROJECT_SUMMARY.md",
+      "target": "document:docs/QUICKSTART.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/QUICKSTART.md",
+      "target": "document:docs/DESIGN.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/DESIGN.md",
+      "target": "document:docs/CONFIG_STRUCTURE.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/CONFIG_STRUCTURE_v1.0.4.md",
+      "target": "document:docs/CONFIG_STRUCTURE.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/CHANGELOG.md",
+      "target": "document:docs/FIX_v1.0.2.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/CHANGELOG.md",
+      "target": "document:docs/FIX_v1.0.3.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/CHANGELOG.md",
+      "target": "document:docs/FIX_SUMMARY.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/COMPLETE_FIX_SUMMARY.md",
+      "target": "document:docs/FIX_SUMMARY.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/COMPLETE_FIX_SUMMARY.md",
+      "target": "document:docs/FIX_v1.0.2.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/COMPLETE_FIX_SUMMARY.md",
+      "target": "document:docs/FIX_v1.0.3.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/FIX_v1.0.3.md",
+      "target": "document:docs/FIX_v1.0.2.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/PAPER_QUICK_REF.md",
+      "target": "document:docs/PAPER_READER_GUIDE.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/PAPER_READER_GUIDE.md",
+      "target": "document:docs/CONFIG_STRUCTURE.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/PAPER_QUICK_REF.md",
+      "target": "document:docs/CONFIG_STRUCTURE.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:docs/DIRECTORY_STRUCTURE.md",
+      "target": "document:docs/PROJECT_SUMMARY.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/changes/align-task-config-standard/.openspec.yaml",
+      "target": "document:openspec/changes/align-task-config-standard/proposal.md",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:openspec/changes/align-task-config-standard/proposal.md",
+      "target": "document:openspec/changes/align-task-config-standard/design.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/align-task-config-standard/proposal.md",
+      "target": "document:openspec/changes/align-task-config-standard/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/align-task-config-standard/design.md",
+      "target": "document:openspec/changes/align-task-config-standard/proposal.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/align-task-config-standard/tasks.md",
+      "target": "document:openspec/changes/align-task-config-standard/design.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/.openspec.yaml",
+      "target": "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/proposal.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/.openspec.yaml",
+      "target": "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/design.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/.openspec.yaml",
+      "target": "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/proposal.md",
+      "target": "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/design.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/proposal.md",
+      "target": "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/design.md",
+      "target": "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/.openspec.yaml",
+      "target": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/proposal.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/.openspec.yaml",
+      "target": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/design.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/.openspec.yaml",
+      "target": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/proposal.md",
+      "target": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/design.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/proposal.md",
+      "target": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/design.md",
+      "target": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/.openspec.yaml",
+      "target": "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/proposal.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/proposal.md",
+      "target": "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/design.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/design.md",
+      "target": "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/tasks.md",
+      "target": "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/proposal.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/.openspec.yaml",
+      "target": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/proposal.md",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/proposal.md",
+      "target": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/design.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/proposal.md",
+      "target": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/design.md",
+      "target": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/tasks.md",
+      "target": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/RESULTS.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/RESULTS.md",
+      "target": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/design.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/proposal.md",
+      "target": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/design.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/proposal.md",
+      "target": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/design.md",
+      "target": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/proposal.md",
+      "target": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/user_prompt.txt",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/design.md",
+      "target": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/user_prompt.txt",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/.openspec.yaml",
+      "target": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/proposal.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/proposal.md",
+      "target": "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/design.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/proposal.md",
+      "target": "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/design.md",
+      "target": "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/.openspec.yaml",
+      "target": "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/proposal.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/.openspec.yaml",
+      "target": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/proposal.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/.openspec.yaml",
+      "target": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/design.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/.openspec.yaml",
+      "target": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/proposal.md",
+      "target": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/design.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/proposal.md",
+      "target": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/design.md",
+      "target": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/tasks.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:_patch_tasks.py",
+      "target": "function:_patch_tasks.py:build_custom_rubrics",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:_patch_tasks.py",
+      "target": "function:_patch_tasks.py:build_custom_rubrics",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "target": "function:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py:make_turn",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "target": "function:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py:run_one",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "target": "function:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "target": "function:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py:make_turn",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "target": "function:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py:run_one",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "target": "function:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py:main",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "target": "file:evaluator.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "target": "file:trajectory.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "target": "file:utils/connection.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "target": "class:evaluator.py:Evaluator",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "target": "class:trajectory.py:Trajectory",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "target": "function:utils/connection.py:build_openclaw_client",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "config:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/config_eval_exp.json",
+      "target": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/user_prompt.txt",
+      "target": "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:.understand-anything/config.json",
+      "target": "file:.understand-anything/.understandignore",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/config.yaml",
+      "target": "document:openspec/specs/evaluation-file-isolation/spec.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/config.yaml",
+      "target": "document:openspec/specs/simulator-session-isolation/spec.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/config.yaml",
+      "target": "document:openspec/specs/trajectory-capture/spec.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/config.yaml",
+      "target": "document:openspec/specs/trajectory-evaluation/spec.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:openspec/config.yaml",
+      "target": "document:openspec/specs/trajectory-persistence/spec.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/specs/evaluation-file-isolation/spec.md",
+      "target": "document:openspec/specs/evaluation-file-isolation/spec.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/specs/trajectory-capture/spec.md",
+      "target": "document:openspec/specs/trajectory-capture/spec.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/specs/trajectory-evaluation/spec.md",
+      "target": "document:openspec/specs/trajectory-evaluation/spec.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/specs/trajectory-capture/spec.md",
+      "target": "document:openspec/specs/trajectory-evaluation/spec.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/specs/trajectory-evaluation/spec.md",
+      "target": "document:openspec/specs/trajectory-persistence/spec.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/specs/trajectory-evaluation/spec.md",
+      "target": "document:openspec/specs/evaluation-file-isolation/spec.md",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:scripts/cleanup_map.py",
+      "target": "function:scripts/cleanup_map.py:cleanup",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/cleanup_map.py",
+      "target": "function:scripts/cleanup_map.py:cleanup",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/fix_hard_tasks.py",
+      "target": "function:scripts/fix_hard_tasks.py:fix_q1_A",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/fix_hard_tasks.py",
+      "target": "function:scripts/fix_hard_tasks.py:fix_q1_B",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/fix_hard_tasks.py",
+      "target": "function:scripts/fix_hard_tasks.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "function:scripts/fix_hard_tasks.py:main",
+      "target": "function:scripts/fix_hard_tasks.py:fix_q1_A",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scripts/fix_hard_tasks.py:main",
+      "target": "function:scripts/fix_hard_tasks.py:fix_q1_B",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/generate_configs.py",
+      "target": "function:scripts/generate_configs.py:generate_single_config",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/generate_configs.py",
+      "target": "function:scripts/generate_configs.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "function:scripts/generate_configs.py:main",
+      "target": "function:scripts/generate_configs.py:generate_single_config",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/pairing_fix.py",
+      "target": "function:scripts/pairing_fix.py:find_operator",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/pairing_fix.py",
+      "target": "function:scripts/pairing_fix.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "function:scripts/pairing_fix.py:main",
+      "target": "function:scripts/pairing_fix.py:find_operator",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/patch_eval_step.py",
+      "target": "function:scripts/patch_eval_step.py:patch_q1",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/patch_eval_step.py",
+      "target": "function:scripts/patch_eval_step.py:patch_uq",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/patch_eval_step.py",
+      "target": "function:scripts/patch_eval_step.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "function:scripts/patch_eval_step.py:main",
+      "target": "function:scripts/patch_eval_step.py:patch_q1",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scripts/patch_eval_step.py:main",
+      "target": "function:scripts/patch_eval_step.py:patch_uq",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/probe_chat_history.py",
+      "target": "function:scripts/probe_chat_history.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/scan_hard_tasks.py",
+      "target": "function:scripts/scan_hard_tasks.py:jp",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/scan_hard_tasks.py",
+      "target": "function:scripts/scan_hard_tasks.py:scan_q1",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/scan_hard_tasks.py",
+      "target": "function:scripts/scan_hard_tasks.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "function:scripts/scan_hard_tasks.py:scan_q1",
+      "target": "function:scripts/scan_hard_tasks.py:jp",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:scripts/scan_hard_tasks.py:main",
+      "target": "function:scripts/scan_hard_tasks.py:scan_q1",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:test/example_test.py",
+      "target": "function:test/example_test.py:test_imports",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:test/example_test.py",
+      "target": "function:test/example_test.py:test_config_loading",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:test/example_test.py",
+      "target": "function:test/example_test.py:test_gateway_connection",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:test/example_test.py",
+      "target": "function:test/example_test.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "function:test/example_test.py:main",
+      "target": "function:test/example_test.py:test_imports",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:test/example_test.py:main",
+      "target": "function:test/example_test.py:test_config_loading",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:test/example_test.py:main",
+      "target": "function:test/example_test.py:test_gateway_connection",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:test/example_test.py:test_gateway_connection",
+      "target": "function:utils/connection.py:check_http_health",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:utils/connection.py",
+      "target": "class:utils/connection.py:ResilientGateway",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:utils/connection.py",
+      "target": "function:utils/connection.py:check_http_health",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:utils/connection.py",
+      "target": "function:utils/connection.py:build_openclaw_client",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:utils/connection.py",
+      "target": "function:utils/connection.py:rebuild_gateway",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:utils/connection.py",
+      "target": "class:utils/connection.py:ResilientGateway",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:utils/connection.py",
+      "target": "function:utils/connection.py:check_http_health",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:utils/connection.py",
+      "target": "function:utils/connection.py:build_openclaw_client",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:utils/connection.py",
+      "target": "function:utils/connection.py:rebuild_gateway",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:utils/connection.py:build_openclaw_client",
+      "target": "class:utils/connection.py:ResilientGateway",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:openclaw_automation.py",
+      "target": "file:utils/connection.py",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:test/test_sdk.py",
+      "target": "function:test/test_sdk.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "document:openspec/changes/align-task-config-standard/design.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/align-task-config-standard/proposal.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/align-task-config-standard/proposal.md",
+      "target": "file:evaluator.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/proposal.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/proposal.md",
+      "target": "file:trajectory.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/proposal.md",
+      "target": "file:evaluator.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/design.md",
+      "target": "file:trajectory.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/design.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/design.md",
+      "target": "file:evaluator.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/design.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/design.md",
+      "target": "file:evaluator.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/proposal.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/proposal.md",
+      "target": "file:evaluator.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/design.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/proposal.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/design.md",
+      "target": "file:evaluator.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/design.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/proposal.md",
+      "target": "file:evaluator.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/proposal.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/proposal.md",
+      "target": "file:user_simulator.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/proposal.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/proposal.md",
+      "target": "file:evaluator.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/design.md",
+      "target": "file:evaluator.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/design.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/proposal.md",
+      "target": "file:evaluator.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/proposal.md",
+      "target": "file:user_simulator.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/proposal.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/proposal.md",
+      "target": "file:trajectory.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/design.md",
+      "target": "file:evaluator.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/design.md",
+      "target": "file:user_simulator.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/design.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/design.md",
+      "target": "file:evaluator.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/design.md",
+      "target": "file:trajectory.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/design.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/proposal.md",
+      "target": "file:evaluator.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/proposal.md",
+      "target": "file:trajectory.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/proposal.md",
+      "target": "file:openclaw_automation.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ],
+  "layers": [
+    {
+      "id": "layer:orchestration-engine",
+      "name": "编排引擎层",
+      "description": "配置驱动的任务编排核心：openclaw_automation 搭建工作区与创建 Agent 并驱动多轮查询执行，联动 user_simulator 用户模拟与 trajectory 轨迹/证据采集，构成配置到执行的闭环。",
+      "nodeIds": [
+        "file:openclaw_automation.py",
+        "file:user_simulator.py",
+        "file:trajectory.py"
+      ]
+    },
+    {
+      "id": "layer:evaluation-engine",
+      "name": "评估引擎层",
+      "description": "基于 rubric/oracle 的加权门控评分核心：Scorer 打分与结构化评估结果由 evaluator.py 驱动，配合 evaluator_user_prompt.md 提示词模板对 Agent 每轮输出进行裁决。",
+      "nodeIds": [
+        "file:evaluator.py",
+        "document:evaluator_user_prompt.md"
+      ]
+    },
+    {
+      "id": "layer:connection-foundation",
+      "name": "连接底座层",
+      "description": "封装 ResilientGateway 网关连接与 build_openclaw_client 客户端构建的底层基础模块，被编排引擎与实验脚本共同依赖，是全系统的连接地基。",
+      "nodeIds": [
+        "file:utils/__init__.py",
+        "file:utils/connection.py"
+      ]
+    },
+    {
+      "id": "layer:agent-definitions",
+      "name": "Agent 定义层",
+      "description": "各业务 Agent（audit_assistant/news_reader/paper_reader）的 SOUL.md 人格设定、USER.md 用户上下文与 TOOLS.md 工具说明，为运行时 Agent 提供人格与能力画像。",
+      "nodeIds": [
+        "document:agents/audit_assistant/SOUL.md",
+        "document:agents/audit_assistant/USER.md",
+        "document:agents/news_reader/SOUL.md",
+        "document:agents/news_reader/USER.md",
+        "document:agents/paper_reader/SOUL.md",
+        "document:agents/paper_reader/USER.md",
+        "document:agents/TOOLS.md"
+      ]
+    },
+    {
+      "id": "layer:task-fixtures",
+      "name": "任务夹具层",
+      "description": "0701 标准模板下的单任务运行素材：env_config/user_profile/user_queries 任务定义、oracle 标准答案、MAP_Windows 路径映射与 pilot 试跑结果，作为任务编排与评估的输入基准。",
+      "nodeIds": [
+        "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/MAP_Windows.json",
+        "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/env_config.json",
+        "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/oracle.json",
+        "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/results_4pilot.json",
+        "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/user_profile_08_经济学硕士生_Stats.json",
+        "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/user_queries.json",
+        "config:0701_任务管线产物标准模板/task_configs/08_科研助手_描述统计相关分析_q1.json"
+      ]
+    },
+    {
+      "id": "layer:test",
+      "name": "测试层",
+      "description": "覆盖评估器、评分逻辑、轨迹采集、scoring_ref 解析、用户模拟器与 SDK 的单元/集成测试，验证核心引擎行为。",
+      "nodeIds": [
+        "file:test/test_evaluator.py",
+        "file:test/test_scoring.py",
+        "file:test/test_trajectory.py",
+        "file:test/test_scoring_ref.py",
+        "file:test/test_simulator.py",
+        "file:test/example_test.py",
+        "file:test/test_sdk.py"
+      ]
+    },
+    {
+      "id": "layer:tooling-scripts",
+      "name": "工具脚本层",
+      "description": "批跑、修复、生成与探测类运维脚本（run_all_hard_tasks/rerun_batchA*/generate_configs 等）及根目录零散补丁脚本，服务于任务批量执行与配置维护。",
+      "nodeIds": [
+        "file:scripts/run_all_hard_tasks.py",
+        "file:scripts/rerun_batchA.py",
+        "file:scripts/rerun_batchA_final.py",
+        "file:scripts/cleanup_map.py",
+        "file:scripts/fix_hard_tasks.py",
+        "file:scripts/generate_configs.py",
+        "file:scripts/pairing_fix.py",
+        "file:scripts/patch_eval_step.py",
+        "file:scripts/probe_chat_history.py",
+        "file:scripts/run_rl14_batch.py",
+        "file:scripts/scan_hard_tasks.py",
+        "file:_fix_userdir.py",
+        "file:_patch_tasks.py",
+        "file:_run_dcb.py"
+      ]
+    },
+    {
+      "id": "layer:openspec-governance",
+      "name": "OpenSpec 规范治理层",
+      "description": "OpenSpec 能力规范（specs/）与变更提案体系（changes/ 的 proposal/design/tasks/spec 及归档），配套 .openspec.yaml 元数据与实验脚本，记录系统演进的规范与决策。",
+      "nodeIds": [
+        "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/run_eval_experiment.py",
+        "config:openspec/changes/align-task-config-standard/.openspec.yaml",
+        "document:openspec/changes/align-task-config-standard/proposal.md",
+        "document:openspec/changes/align-task-config-standard/design.md",
+        "document:openspec/changes/align-task-config-standard/tasks.md",
+        "config:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/.openspec.yaml",
+        "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/proposal.md",
+        "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/design.md",
+        "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/tasks.md",
+        "config:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/.openspec.yaml",
+        "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/proposal.md",
+        "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/design.md",
+        "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/tasks.md",
+        "config:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/.openspec.yaml",
+        "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/proposal.md",
+        "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/design.md",
+        "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/tasks.md",
+        "config:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/.openspec.yaml",
+        "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/proposal.md",
+        "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/design.md",
+        "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/tasks.md",
+        "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/RESULTS.md",
+        "config:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/.openspec.yaml",
+        "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/proposal.md",
+        "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/design.md",
+        "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/tasks.md",
+        "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/user_prompt.txt",
+        "config:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/.openspec.yaml",
+        "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/proposal.md",
+        "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/design.md",
+        "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/tasks.md",
+        "config:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/.openspec.yaml",
+        "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/proposal.md",
+        "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/design.md",
+        "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/tasks.md",
+        "document:openspec/changes/align-task-config-standard/specs/task-config-schema/spec.md",
+        "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/specs/trajectory-capture/spec.md",
+        "document:openspec/changes/archive/2026-06-23-add-trajectory-evaluator/specs/trajectory-evaluation/spec.md",
+        "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/specs/simulator-session-isolation/spec.md",
+        "document:openspec/changes/archive/2026-06-24-evaluator-rubric-and-session-isolation/specs/trajectory-evaluation/spec.md",
+        "document:openspec/changes/archive/2026-06-24-evaluator-rubrics-qc/specs/trajectory-evaluation/spec.md",
+        "config:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/config_eval_exp.json",
+        "file:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/eval_step_sweep.py",
+        "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/scripts/user_prompt.txt",
+        "document:openspec/changes/archive/2026-06-26-evaluator-persistent-agent-revamp/specs/trajectory-evaluation/spec.md",
+        "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/specs/trajectory-evaluation/spec.md",
+        "document:openspec/changes/archive/2026-06-29-evaluator-rubric-scoring/specs/trajectory-persistence/spec.md",
+        "document:openspec/changes/archive/2026-06-29-isolate-oracle-rubrics-during-task/specs/evaluation-file-isolation/spec.md",
+        "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/specs/trajectory-capture/spec.md",
+        "document:openspec/changes/archive/2026-06-30-toolcall-capture-via-history/specs/trajectory-evaluation/spec.md",
+        "config:openspec/config.yaml",
+        "document:openspec/specs/evaluation-file-isolation/spec.md",
+        "document:openspec/specs/simulator-session-isolation/spec.md",
+        "document:openspec/specs/trajectory-capture/spec.md",
+        "document:openspec/specs/trajectory-evaluation/spec.md",
+        "document:openspec/specs/trajectory-persistence/spec.md"
+      ]
+    },
+    {
+      "id": "layer:documentation",
+      "name": "文档与项目配置层",
+      "description": "项目总览 README、设计/配置/修复/快速开始等 docs 文档、system_prompt 角色模板、requirements 依赖清单及 understand-anything 工具元配置，提供说明与项目级配置。",
+      "nodeIds": [
+        "document:docs/CHANGELOG.md",
+        "document:docs/COMPLETE_FIX_SUMMARY.md",
+        "document:docs/CONFIG_STRUCTURE.md",
+        "document:docs/CONFIG_STRUCTURE_v1.0.4.md",
+        "document:docs/DESIGN.md",
+        "document:docs/DIRECTORY_STRUCTURE.md",
+        "document:docs/FIX_SUMMARY.md",
+        "document:docs/FIX_v1.0.2.md",
+        "document:docs/FIX_v1.0.3.md",
+        "document:docs/PAPER_QUICK_REF.md",
+        "document:docs/PAPER_READER_GUIDE.md",
+        "document:docs/PROJECT_SUMMARY.md",
+        "document:docs/QUICKSTART.md",
+        "document:docs/README.md",
+        "file:.understand-anything/.understandignore",
+        "config:.understand-anything/config.json",
+        "document:README.md",
+        "document:system_prompt.md",
+        "config:requirements.txt"
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "项目总览：这是什么系统",
+      "description": "从 README.md 开始，建立全局认知。OpenClaw 自动化任务系统是一个配置驱动的 AI Agent 任务编排与评估框架：用 JSON/YAML 声明 Agent 与查询任务，系统负责搭建工作区、创建 Agent、驱动多轮对话，并对每轮输出打分。README 覆盖快速开始、配置结构、六大核心组件（ConfigLoader / WorkspaceManager / AgentManager / QueryOrchestrator / OpenClawAutomation / Evaluator）与系统架构，是理解后续每一步代码的路线图。搭配 QUICKSTART.md 可在 5 分钟内跑通第一个任务。",
+      "nodeIds": [
+        "document:README.md",
+        "document:docs/QUICKSTART.md"
+      ]
+    },
+    {
+      "order": 2,
+      "title": "架构设计与目录蓝图",
+      "description": "在深入代码前，先读设计文档看清全貌。DESIGN.md 用架构图串起五大核心组件与「轨迹捕获 + 第三方评估」闭环，DIRECTORY_STRUCTURE.md 则解释 agents/、configs/、docs/、logs/ 等目录各自的职责。这两份文档把 README 的概念落到具体文件位置，让你知道接下来每一步代码在项目中的坐标。",
+      "nodeIds": [
+        "document:docs/DESIGN.md",
+        "document:docs/DIRECTORY_STRUCTURE.md"
+      ]
+    },
+    {
+      "order": 3,
+      "title": "系统入口与编排引擎",
+      "description": "openclaw_automation.py 是整个系统 fan-in 最高（被 25 处引用）也是 fan-out 最高（引出 20 处）的绝对核心——它就是 README 里描述的编排引擎。文件顶部用一系列 Pydantic 配置模型（AutomationConfig / AgentConfigItem / QueryItem / InputDirConfig）做配置校验，ConfigLoader 从 JSON/YAML 加载配置，WorkspaceManager 为每个 Agent 铺设独立工作区，AgentManager 通过 OpenClaw 客户端创建并钉住模型，最后 OpenClawAutomation.run 串起全流程。这一步先把握「配置 → 工作区 → Agent → 执行」的主干骨架。",
+      "nodeIds": [
+        "file:openclaw_automation.py",
+        "config:requirements.txt"
+      ],
+      "languageLesson": "Pydantic 的 field_validator / model_validator 让配置在加载时即完成结构校验与归一化（例如把字符串或字典形式的 user_dir 统一成 UserDirConfig）；入口通过 asyncio 异步驱动 Agent 查询，是「配置即代码」范式的典型实现。"
+    },
+    {
+      "order": 4,
+      "title": "连接底座：网关与客户端",
+      "description": "编排引擎要跑起来，底下必须先有一条到 OpenClaw 网关的可靠连接。utils/connection.py 封装了 ResilientGateway（带重连/健康检查的网关）与 build_openclaw_client 客户端构建逻辑，是被编排引擎和实验脚本共同依赖的连接地基（连接底座层）。理解它，才能读懂第 3 步里 AgentManager 等待网关就绪、以及后面 execute_queries 中断线重连兜底的那部分逻辑。",
+      "nodeIds": [
+        "file:utils/connection.py",
+        "file:utils/__init__.py"
+      ]
+    },
+    {
+      "order": 5,
+      "title": "用户模拟器：扮演真实用户",
+      "description": "自动化任务要模拟真人多轮追问，这由 user_simulator.py 承担。User_simulator 基于 LLM（OpenAI 客户端）加载 system_prompt.md 角色模板，注入用户画像、用户文件目录与对话历史，生成一轮轮拟真的用户回复；它按 session_name 键控多实例以隔离跨会话记忆。第 3 步的编排引擎正是通过 create_simulator 工厂拿到它来驱动对话的。",
+      "nodeIds": [
+        "file:user_simulator.py",
+        "document:system_prompt.md"
+      ],
+      "languageLesson": "user_simulator 用 httpx.Client 注入自定义代理，并以模板字符串 replace 渲染系统提示词——把「角色设定」外置成 .md 模板、运行时再填充 Origin_query / 对话历史 / 评估反馈等占位符，是提示词工程与代码解耦的常见手法。"
+    },
+    {
+      "order": 6,
+      "title": "轨迹采集：为评估留存证据",
+      "description": "有了对话，就要如实记录发生了什么——这是 trajectory.py 的职责（fan-in 11 / fan-out 13，核心模块之一）。它用 Pydantic 定义 ToolCallEvidence / FileEvidence / TurnRecord / Trajectory 四级数据模型，并通过 extract_tool_calls 从 chat_history 配对 tool_use 与 tool_result 采集工具调用，再由 capture_file_evidence 以磁盘真值校正 Agent 自述的文件证据。关键设计：证据缺失不等于造假，空 tool_calls 不会被当作负面证据。",
+      "nodeIds": [
+        "file:trajectory.py"
+      ],
+      "languageLesson": "工具调用证据不走实时事件流、而改从 OC 会话历史（chat_history）解析，源于「服务端自主 agent 的工具事件不经实时流」这一实测根因；配合 async 的 gateway 取文件与 _strip_nul 清理 NUL 字节，体现了「以磁盘真相为准、按 id 配对增量截取」的取证纪律。"
+    },
+    {
+      "order": 7,
+      "title": "评估引擎：rubric + oracle 打分",
+      "description": "系统的裁判核心是 evaluator.py（fan-in 18）。它把评分从「LLM 主观拍脑袋」升级为「结构化 rubric + 确定性公式聚合」：Rubric 是单条二值验收标准，ScoringSpec 定义加权 bucket 与 gate_zero 一票否决，Scorer 据此算出加权完成度，Evaluator 主类则驱动一个持久化裁判 Agent 逐轮评估——注入 rubric/oracle 构建提示词、产出结构化 EvaluationResult、格式化反馈回传给模拟器。evaluator_user_prompt.md 是它注入任务/证据/Oracle/Rubric 的提示词模板。",
+      "nodeIds": [
+        "file:evaluator.py",
+        "document:evaluator_user_prompt.md"
+      ],
+      "languageLesson": "评分采用「gate 门控 + bucket 加权」的确定性聚合：任一 gate rubric 判 0 即整体归零，其余按桶权重归一后加权求和。这种把主观判断收敛到二值 rubric、再用固定公式聚合的做法，大幅降低了 LLM 评分的方差。"
+    },
+    {
+      "order": 8,
+      "title": "Agent 定义：人格与能力画像",
+      "description": "第 3 步创建的 Agent 到底「是谁、会什么」，由 Agent 定义层的 Markdown 描述。每个业务 Agent（audit_assistant / news_reader / paper_reader）都有 SOUL.md 定义人格与能力、USER.md 提供用户上下文，另有共享的 TOOLS.md 约束联网搜索与网页读取的正确调用方式。WorkspaceManager 会把这些文件拷进 Agent 工作区，塑造运行时行为。",
+      "nodeIds": [
+        "document:agents/paper_reader/SOUL.md",
+        "document:agents/paper_reader/USER.md",
+        "document:agents/TOOLS.md"
+      ]
+    },
+    {
+      "order": 9,
+      "title": "任务夹具：一个完整任务长什么样",
+      "description": "把前面所有组件的输入拼齐，就是任务夹具层。以「08_科研助手_描述统计与相关分析」为例：user_queries.json 是任务核心定义（用户查询、所需文件、rubrics 与完整 evaluate 配置），oracle.json 是从真实 xlsx 精算的标准答案（被 evaluate 通过 oracle_ref 引用作为打分基准），user_profile 提供人格化画像，env_config 模拟 Windows 沙盒环境，MAP_Windows 把虚拟路径映射到真实文件。读懂它们之间的 $ref 引用关系，就理解了「任务 → 标准答案 → 评分」的数据依赖。",
+      "nodeIds": [
+        "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/user_queries.json",
+        "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/oracle.json",
+        "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/user_profile_08_经济学硕士生_Stats.json",
+        "config:0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析/env_config.json",
+        "config:0701_任务管线产物标准模板/task_configs/08_科研助手_描述统计相关分析_q1.json"
+      ]
+    },
+    {
+      "order": 10,
+      "title": "OpenSpec 规范治理：系统如何演进",
+      "description": "这个项目的架构不是拍脑袋定的，而是通过 OpenSpec 变更提案逐步演进的。openspec/specs/ 下的能力主规范（trajectory-capture / trajectory-evaluation / evaluation-file-isolation）定义了系统「必须满足什么」，changes/ 下每个变更用 proposal（为什么改）+ design（关键决策）+ tasks（落地清单）三件套记录演进。例如 align-task-config-standard 把单任务配置对齐到 0701 新模板——这解释了第 9 步夹具的字段设计从何而来。",
+      "nodeIds": [
+        "document:openspec/specs/trajectory-evaluation/spec.md",
+        "document:openspec/changes/align-task-config-standard/proposal.md",
+        "document:openspec/changes/align-task-config-standard/design.md"
+      ]
+    },
+    {
+      "order": 11,
+      "title": "测试：核心引擎的行为契约",
+      "description": "收尾回到质量保障。测试层与核心模块一一配对（结构分析中它们互为紧耦合簇）：test_scoring.py 覆盖 Rubric 归一化、门控一票否决与 bucket 加权，test_evaluator.py 验证结构化输出解析与无 rubric 时的归一化，test_trajectory.py 覆盖工具调用捕获、fallback 标记与磁盘真值覆盖自述。读完这些用例，你会对第 6、7 步引擎的边界行为有最精确的理解——它们就是这些模块的可执行规格。",
+      "nodeIds": [
+        "file:test/test_scoring.py",
+        "file:test/test_evaluator.py",
+        "file:test/test_trajectory.py"
+      ]
+    },
+    {
+      "order": 12,
+      "title": "批量运维脚本：规模化跑任务",
+      "description": "最后是把系统用起来的工具脚本层。run_all_hard_tasks.py 串行批跑硬任务并提供任务收集、user_query 备份/还原、日志解析与实时汇总等共享工具函数；rerun_batchA_final.py 在其之上加了 done 文件断点续跑机制，避免重复执行已完成任务。它们本质是第 3 步入口的批量调度外壳——理解了单任务闭环，这些脚本就只是「循环 + 兜底」的编排。",
+      "nodeIds": [
+        "file:scripts/run_all_hard_tasks.py",
+        "file:scripts/rerun_batchA_final.py"
+      ],
+      "languageLesson": "脚本用 \\\\?\\ 长路径前缀绕过 Windows MAX_PATH 限制，通过 subprocess.run 串行调度并设单任务硬超时；断点续跑用一个 done 记录文件（read_done/mark_done）持久化已完成集合——这是无框架依赖的轻量批处理常见模式。"
+    }
+  ]
+}
