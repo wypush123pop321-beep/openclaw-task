@@ -196,11 +196,13 @@ class EvaluateConfig(BaseModel):
     # 新增:外部引用(相对 config 文件目录,由 ConfigLoader 解引用 pass 加载并填充运行时字段)
     oracle_ref: Optional[str] = Field(None, description="ground-truth 文件相对路径,供 oracle_cmp 比对")
     rubrics_ref: Optional[str] = Field(None, description="结构化 rubric 的 JSON-Pointer(形如 file.json#/a/b/c)")
-    scoring: Optional[dict] = Field(None, description="评分块:gate_zero/weights/bucket_map(原始,解析为 ScoringSpec)")
+    scoring_ref: Optional[str] = Field(None, description="评分块的 JSON-Pointer(形如 file.json#/a/b/c/scoring);解引用后填入运行时 scoring")
 
     # 运行时字段(不来自 JSON,由解引用 pass 注入;exclude 不参与序列化)
     structured_rubrics: List[Rubric] = Field(default_factory=list, exclude=True)
     oracle_data: Optional[dict] = Field(None, exclude=True)
+    # scoring:由 scoring_ref 解引用后填充的评分块(gate_zero/weights/bucket_map),解析为 scoring_spec。
+    scoring: Optional[dict] = Field(None, exclude=True)
     scoring_spec: Optional[ScoringSpec] = Field(None, exclude=True)
     # 文件隔离 vault:{绝对路径: 原始文本};解引用时留存,供执行期删除/还原(整文件粒度)。
     file_vault: Dict[str, str] = Field(default_factory=dict, exclude=True)
