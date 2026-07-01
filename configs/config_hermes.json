@@ -1,0 +1,69 @@
+{
+  "system": {
+    "platform": [
+      "windows"
+    ],
+    "python": "3.11",
+    "tools": []
+  },
+  "input_dir": {
+    "skill_dir": {},
+    "user_dir": null
+  },
+  "harness": {
+    "type": "hermes",
+    "connection": {
+      "launch": {
+        "command": "python",
+        "args": [
+          "-m",
+          "acp_adapter"
+        ],
+        "cwd": "D:/Users/w00802407/0616-work/trae_workspace/hermes-agent",
+        "env": {
+          "HERMES_HOME": "~/.hermes"
+        }
+      },
+      "model": "",
+      "provider": "custom",
+      "api_key": "",
+      "base_url": "",
+      "_note": "模型/凭证由 ~/.hermes/config.yaml(provider=custom)+ ~/.hermes/.env(OPENAI_API_KEY/BASE_URL/代理)托管;connection.model 留空以免 set_session_model 触发 hermes 对 gemini 名的 provider 误判",
+      "auto_approve_permissions": true,
+      "init_timeout": 120
+    }
+  },
+  "agents": [
+    {
+      "name": "main3",
+      "config": [],
+      "skills": []
+    }
+  ],
+  "queries": [
+    {
+      "agent_name": "main3",
+      "text": "中国的经济中心是哪座城市？请直接用一句话回答城市名，不要使用任何工具或联网检索。",
+      "session_name": "test",
+      "timeout": 1800,
+      "use_simulator": false
+    },
+    {
+      "agent_name": "main3",
+      "text": "我们刚才聊到的那座城市叫什么名字？只回答城市名；如果此前没有聊过具体城市就说\"没有上下文\"。不要使用任何工具。",
+      "session_name": "eval",
+      "timeout": 1800,
+      "use_simulator": false
+    },
+    {
+      "agent_name": "main3",
+      "text": "我们刚才聊到的那座城市叫什么名字？只回答城市名；如果此前没有聊过具体城市就说\"没有上下文\"。不要使用任何工具。",
+      "session_name": "test",
+      "timeout": 1800,
+      "use_simulator": false
+    }
+  ],
+  "workspace_base": "~/.hermes/workspace",
+  "simulator_config": "configs/user_proxy_model.json",
+  "user_max_turn": 5
+}

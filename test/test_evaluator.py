@@ -1,7 +1,8 @@
 """Evaluator 单测(能力: trajectory-evaluation)。
 
 用法:  python test/test_evaluator.py
-不依赖网关/网络/LLM,只验证纯逻辑:结构化解析、证据渲染、反馈格式化。
+不依赖网关/网络/LLM/具体 harness SDK,只验证纯逻辑:结构化解析(中立兜底)、证据渲染、
+反馈格式化、无 STRUCTURED_OUTPUT 能力时的解析兜底归一。
 LLM 裁判本身的判准需后续用校准集验证(本测试不覆盖)。
 """
 
@@ -14,7 +15,8 @@ if hasattr(sys.stdout, "reconfigure"):
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from openclaw_sdk.output.structured import StructuredOutput
+from harness import Capability, parse_structured_text
+from harness.types import TurnResult
 
 from evaluator import EvaluateConfig, EvaluationResult, Evaluator, Rubric, RubricCheck
 from trajectory import FileEvidence, TurnRecord, Trajectory, _render_turn
@@ -30,7 +32,7 @@ def test_structured_eval_output_parses():
         '"citations": ["b.md: 声称生成,但磁盘上不存在 ✗"], '
         '"reason": "声称与磁盘证据矛盾"}\n```'
     )
-    ev = StructuredOutput.parse(raw, EvaluationResult)
+    ev = parse_structured_text(raw, EvaluationResult)
     assert ev.completion == 0.4
     assert ev.inclination == "reject"
     assert ev.violations and "b.md" in ev.violations[0]
@@ -60,7 +62,7 @@ def test_evidence_incomplete_marked_non_negative():
 
 def test_format_feedback():
     """反馈文本格式化(给 simulator 看)。"""
-    ev_obj = Evaluator(EvaluateConfig(), client=None, run_id="t", session_name="t")
+    ev_obj = Evaluator(EvaluateConfig(), adapter=None, run_id="t", session_name="t")
     fb = ev_obj.format_feedback(
         EvaluationResult(
             completion=0.8, inclination="accept",
@@ -75,7 +77,7 @@ def test_format_feedback():
 
 
 def _mk_eval(**cfg) -> Evaluator:
-    return Evaluator(EvaluateConfig(**cfg), client=None, run_id="t", session_name="t")
+    return Evaluator(EvaluateConfig(**cfg), adapter=None, run_id="t", session_name="t")
 
 
 def _mk_turn() -> tuple[Trajectory, TurnRecord]:
@@ -100,7 +102,7 @@ def test_rubric_check_and_result_parse():
         '{"rubric_id": "R3", "criterion": "已给出订单确认号", "passed": 1, "evidence": "工具返回确认号 ABC123"}'
         '], "reason": "返程未完成"}'
     )
-    ev = StructuredOutput.parse(raw, EvaluationResult)
+    ev = parse_structured_text(raw, EvaluationResult)
     assert len(ev.rubric_checks) == 2
     assert ev.rubric_checks[0].passed == 0
     assert ev.rubric_checks[1].passed == 1
@@ -164,11 +166,14 @@ def test_feedback_to_simulator_switch():
 
 
 def test_no_rubric_normalizes_rubric_checks_empty():
-    """无 rubric 时即便模型自拟 rubric_checks, 也被确定性归一为空(落盘前)。"""
-    import asyncio
-    from openclaw_sdk.core.types import ExecutionResult
+    """无 rubric 时即便模型自拟 rubric_checks, 也被确定性归一为空(落盘前)。
 
-    # 伪造一个会"幻觉"出 rubric_checks 的裁判 agent(无网络/无 LLM)
+    经一个**无 STRUCTURED_OUTPUT/SESSION_RESET 能力**的 fake adapter 驱动:
+    走解析兜底路径(_run_structured),验证归一保底生效。
+    """
+    import asyncio
+
+    # 伪造一个会"幻觉"出 rubric_checks 的裁判输出(无网络/无 LLM)
     hallucinated = (
         '{"completion": 0.5, "inclination": "uncertain", '
         '"violations": [], "improvements": [], "citations": [], '
@@ -176,17 +181,14 @@ def test_no_rubric_normalizes_rubric_checks_empty():
         '"reason": "无 rubric 也乱填了"}'
     )
 
-    class _FakeAgent:
-        async def execute(self, query: str) -> ExecutionResult:
-            return ExecutionResult(success=True, content=hallucinated, stop_reason="complete")
+    class _FakeAdapter:
+        capabilities = frozenset()  # 无 STRUCTURED_OUTPUT / SESSION_RESET → 走解析兜底、跳过 reset
 
-    class _FakeClient:
-        gateway = None  # 触发 _push_review_files / _reset_session 早退
-        def get_agent(self, name, session):
-            return _FakeAgent()
+        async def execute(self, agent, session, query, *, timeout=None):
+            return TurnResult(success=True, content=hallucinated, stop_reason="complete")
 
     ev = Evaluator(
-        EvaluateConfig(log_evaluations=False), client=_FakeClient(), run_id="t", session_name="t"
+        EvaluateConfig(log_evaluations=False), adapter=_FakeAdapter(), run_id="t", session_name="t"
     )
     traj, rec = _mk_turn()
     result = asyncio.run(ev.evaluate_turn(traj, rec, rubric=[]))

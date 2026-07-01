@@ -82,7 +82,8 @@ def test_scoring_ref_resolved():
         assert len(ev.structured_rubrics) == 2
         assert ev.scoring is not None and "bucket_map" in ev.scoring
         assert ev.scoring_spec is not None and ev.scoring_spec.gate_ids == ["G1"]
-        assert cfg.Harness_Type is None
+        # 合并后:占位 Harness_Type 已被真实 harness 字段取代;无 harness 段应折叠为默认 openclaw
+        assert cfg.harness is not None and cfg.harness.type == "openclaw"
         assert cfg.queries[0].is_noise is False  # use_simulator=True
     print("✓ scoring_ref 显式解析 + 跨目录引用 + scoring_spec 合成")
 

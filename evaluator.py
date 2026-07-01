@@ -1,15 +1,16 @@
 """独立第三方 Evaluator(能力: trajectory-evaluation)。
 
-每个 turn 的 agent 回复之后,由一个**独立于执行任务 agent** 的 OC agent 基于
+每个 turn 的 agent 回复之后,由一个**独立于执行任务 agent** 的评估 agent 基于
 可核验证据(tool_calls + 磁盘真相文件)做评估,产出"完成度/改进点/不符合项/倾向 +
 引证",反馈给 user_simulator。
 
 设计要点(见 design.md):
-- D1 evaluator 是独立 OC agent,非执行 agent。
-- D2 逐轮在环;D3 simulator 仍拍板,evaluator 仅顾问(软反馈,无硬否决)。
-- D4 无状态:每轮新开 session,显式投喂(任务 + 历轮全文 + 上轮反馈 + 本轮证据)。
-- D5 证据以磁盘真相为准;D6 文本/轨迹拼提示词(a)+ 文件推进 evaluator 工作区(b)。
-- D9 结构化输出 + 引证 + 落盘。
+- 评估 agent 独立于执行 agent;经中立 `HarnessAdapter` 驱动,不直接依赖任何 harness SDK。
+- 逐轮在环;simulator 仍拍板,evaluator 仅顾问(软反馈,无硬否决)。
+- 持久 evaluator:agent 实体同一 query 内复用,每轮评估前经 `adapter.reset_session`
+  清空会话(缺 `SESSION_RESET` 能力则跳过);显式压缩投喂(任务 + 最近 X 轮证据 + 产物指针)。
+- 证据以磁盘真相为准;结构化裁决经 `adapter.structured`(缺 `STRUCTURED_OUTPUT` 能力则
+  解析兜底 + "仅输出 JSON"强约束重试,见 D5);引证 + 落盘。
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
-from openclaw_sdk.output.structured import StructuredOutput
+from harness import Capability, HarnessAdapter, StructuredParseError, parse_structured_text
 
 from trajectory import TurnRecord, Trajectory
 
@@ -204,8 +205,9 @@ class EvaluateConfig(BaseModel):
     # scoring:由 scoring_ref 解引用后填充的评分块(gate_zero/weights/bucket_map),解析为 scoring_spec。
     scoring: Optional[dict] = Field(None, exclude=True)
     scoring_spec: Optional[ScoringSpec] = Field(None, exclude=True)
-    # 文件隔离 vault:{绝对路径: 原始文本};解引用时留存,供执行期删除/还原(整文件粒度)。
-    file_vault: Dict[str, str] = Field(default_factory=dict, exclude=True)
+    # 文件隔离 vault:{绝对路径: 原始字节};解引用时留存,供执行期删除/还原(整文件粒度,
+    # 存原始字节以便 BOM/换行等逐字节一致还原,不改动用户数据文件)。
+    file_vault: Dict[str, bytes] = Field(default_factory=dict, exclude=True)
 
     def rubric_items(self) -> List[Rubric]:
         """统一返回结构化 rubric:优先 structured_rubrics,否则把旧式字符串 rubrics 归一。"""
@@ -306,24 +308,29 @@ _SECTIONS = _load_prompt_sections(_USER_PROMPT_FILE)
 # Evaluator
 # ============================================================================
 
+# 无 STRUCTURED_OUTPUT 能力时,解析兜底的"仅输出 JSON"强约束重试次数(D5)
+STRUCTURED_FALLBACK_MAX_RETRIES = 3
+
+
 class Evaluator:
-    """驱动一个**持久** evaluator OC agent,逐评审点评估。
+    """经中立 `HarnessAdapter` 驱动一个**持久** evaluator agent,逐评审点评估。
 
     状态模型:agent 实体在同一 query 内复用(不每轮重建,省建连/初始化开销);
-    但**每次评估前 reset 其会话**——因为 OC 会话会持久化并回放 agent 自身上一轮的判词,
-    不清空会造成判词自我锚定。历史由 harness 的 trajectory 承载,session 不承担记忆。
+    但**每次评估前 reset 其会话**——因为会话会持久化并回放 agent 自身上一轮的判词,
+    不清空会造成判词自我锚定。缺 `SESSION_RESET` 能力时安全跳过(退回不重置等价语义)。
+    历史由 harness 的 trajectory 承载,session 不承担记忆。
     """
 
     def __init__(
         self,
         config: EvaluateConfig,
-        client: Any,
+        adapter: HarnessAdapter,
         run_id: str,
         session_name: str,
         system_prompt: Optional[str] = None,
     ):
         self.config = config
-        self.client = client
+        self.adapter = adapter
         self.run_id = run_id
         # 同一 query 内固定的 evaluator 会话名(跨 turn 复用、每轮 reset)
         self.session_name = session_name
@@ -339,7 +346,7 @@ class Evaluator:
     def create(
         cls,
         config: Optional["EvaluateConfig"],
-        client: Any,
+        adapter: HarnessAdapter,
         run_id: str,
         session_name: str,
         system_prompt: Optional[str] = None,
@@ -352,7 +359,7 @@ class Evaluator:
         if config is None:
             return None
         config.resolve_runtime()  # 兜底装配 scoring_spec(ConfigLoader 未调时)
-        evaluator = cls(config, client, run_id, session_name, system_prompt)
+        evaluator = cls(config, adapter, run_id, session_name, system_prompt)
         logger.info(
             "Evaluator 已启用(agent=%s,session=%s,eval_step=%d,feedback_to_simulator=%s)",
             config.agent_name, session_name, config.eval_step, config.feedback_to_simulator,
@@ -377,19 +384,15 @@ class Evaluator:
         rubric: 随 query 冻结的结构化验收清单;非空时逐条判 0/1 并由 Scorer 算 completion。
         """
         # 持久 agent:同一 query 复用同一会话名(不每轮新建)
-        eval_agent = self.client.get_agent(self.config.agent_name, self.session_name)
-
-        # D1:评估前 reset 会话,确保自身上一轮判词不被回放(防锚定)
-        await self._reset_session(eval_agent)
+        # 评估前 reset 会话,确保自身上一轮判词不被回放(防锚定);缺能力则跳过
+        await self._reset_session()
 
         # 投递(a):origin_query + rubrics + 最近 window 轮 + 产物指针(不投全量历史/不投自身旧判词)
         prompt = self._build_prompt(trajectory, rubric, window)
         prompt_chars = len(prompt)  # token 代理量,供 eval_step 实验对比开销
 
         try:
-            result = await StructuredOutput.execute(
-                eval_agent, prompt, EvaluationResult, max_retries=1
-            )
+            result = await self._run_structured(prompt)
         except Exception as e:  # noqa: BLE001
             logger.warning("evaluator 第 %d 轮评估失败: %s", current_turn.turn, e)
             self._log(trajectory, current_turn, None, error=str(e), window=window, prompt_chars=prompt_chars)
@@ -458,28 +461,53 @@ class Evaluator:
 
     # ------------------------------------------------------------------ #
 
-    async def _reset_session(self, eval_agent: Any) -> None:
-        """评估前清空 evaluator 会话(防判词锚定)。失败则降级继续(不阻断任务)。"""
-        gateway = getattr(self.client, "gateway", None)
-        if gateway is None:
+    async def _reset_session(self) -> None:
+        """评估前清空 evaluator 会话(防判词锚定)。
+
+        经 adapter 的 `SESSION_RESET` 能力完成;缺该能力则安全跳过(退回不重置等价语义),
+        失败亦降级继续(不阻断任务)。
+        """
+        if Capability.SESSION_RESET not in getattr(self.adapter, "capabilities", frozenset()):
+            logger.debug("adapter 无 SESSION_RESET 能力,跳过 evaluator 会话重置")
             return
         try:
-            await gateway.sessions_reset(eval_agent.session_key)
+            await self.adapter.reset_session(self.config.agent_name, self.session_name)
         except Exception as e:  # noqa: BLE001
             logger.debug("evaluator 会话 reset 失败(降级继续): %s", e)
 
-    async def _push_review_files(self, turn: TurnRecord) -> None:
-        gateway = getattr(self.client, "gateway", None)
-        if gateway is None:
-            return
-        for fe in turn.files:
-            if not (fe.checked and fe.exists and fe.content is not None):
-                continue
-            dest = f"{self.config.review_subdir}/{fe.name}"
+    async def _run_structured(self, prompt: str) -> EvaluationResult:
+        """产出结构化裁决:有 `STRUCTURED_OUTPUT` 能力走原生强制 schema;否则解析兜底 + 重试(D5)。
+
+        无原生结构化能力时:`execute` 取自由文本 → `parse_structured_text`;失败则追加
+        "仅输出 JSON"强约束重试有限次(默认 3),全部失败抛 `StructuredParseError`。
+        """
+        agent, session = self.config.agent_name, self.session_name
+        if Capability.STRUCTURED_OUTPUT in getattr(self.adapter, "capabilities", frozenset()):
+            return await self.adapter.structured(
+                agent, session, prompt, EvaluationResult, max_retries=1
+            )
+
+        # 兜底:无原生结构化能力 → 自由文本解析 + 强约束重试
+        last_err: Optional[Exception] = None
+        cur_prompt = prompt
+        for attempt in range(1, STRUCTURED_FALLBACK_MAX_RETRIES + 1):
+            tr = await self.adapter.execute(agent, session, cur_prompt)
             try:
-                await gateway.agents_files_set(self.config.agent_name, dest, fe.content)
-            except Exception as e:  # noqa: BLE001
-                logger.debug("推进被审查文件失败 %s: %s", dest, e)
+                return parse_structured_text(tr.content or "", EvaluationResult)
+            except StructuredParseError as e:
+                last_err = e
+                logger.debug(
+                    "结构化解析兜底第 %d/%d 次失败,追加强约束重试: %s",
+                    attempt, STRUCTURED_FALLBACK_MAX_RETRIES, e,
+                )
+                cur_prompt = (
+                    prompt
+                    + "\n\n[强制约束] 你**只能**输出一个合法 JSON 对象(可用 ```json 围栏),"
+                    "不要输出任何解释、前言或多余文本。"
+                )
+        raise StructuredParseError(
+            f"结构化解析兜底重试 {STRUCTURED_FALLBACK_MAX_RETRIES} 次均失败: {last_err}"
+        )
 
     def _build_prompt(
         self,
