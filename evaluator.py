@@ -164,7 +164,7 @@ class EvaluateConfig(BaseModel):
     字段别名(新名↔历史名,经 AliasChoices 等价):
     - agent_name ↔ evaluator_agent
     - eval_step ↔ evaluate_every_n_turns
-    - feedback_to_simulator ↔ feedback_to_user
+    - to_simulator ↔ feedback_to_simulator ↔ feedback_to_user
     """
     model_config = ConfigDict(populate_by_name=True)
 
@@ -180,9 +180,9 @@ class EvaluateConfig(BaseModel):
         validation_alias=AliasChoices("eval_step", "evaluate_every_n_turns"),
         description="评审频率 X:每 X 个 turn 评一次;最近 X 轮投喂窗口的 X 同此值",
     )
-    feedback_to_simulator: bool = Field(
+    to_simulator: bool = Field(
         False,
-        validation_alias=AliasChoices("feedback_to_simulator", "feedback_to_user"),
+        validation_alias=AliasChoices("to_simulator", "feedback_to_simulator", "feedback_to_user"),
         description="True=评估反馈回流 simulator;False=只评估并落盘、不回流(安全默认,先行观测质量)",
     )
     log_evaluations: bool = Field(True, description="是否把每次评估落盘到 evaluator_use.log")
@@ -354,14 +354,14 @@ class Evaluator:
         config.resolve_runtime()  # 兜底装配 scoring_spec(ConfigLoader 未调时)
         evaluator = cls(config, client, run_id, session_name, system_prompt)
         logger.info(
-            "Evaluator 已启用(agent=%s,session=%s,eval_step=%d,feedback_to_simulator=%s)",
-            config.agent_name, session_name, config.eval_step, config.feedback_to_simulator,
+            "Evaluator 已启用(agent=%s,session=%s,eval_step=%d,to_simulator=%s)",
+            config.agent_name, session_name, config.eval_step, config.to_simulator,
         )
         return evaluator
 
     @property
-    def feedback_to_simulator(self) -> bool:
-        return self.config.feedback_to_simulator
+    def to_simulator(self) -> bool:
+        return self.config.to_simulator
 
     async def evaluate_turn(
         self,
@@ -568,7 +568,7 @@ class Evaluator:
             "window": window,
             "window_turns": [win_start, turn.turn],  # 本次评审覆盖的轮次范围(含端点)
             "prompt_chars": prompt_chars,  # 投喂提示词字符数(token 代理量)
-            "feedback_to_simulator": self.config.feedback_to_simulator,
+            "to_simulator": self.config.to_simulator,
         }
         if result is not None:
             record["evaluation"] = result.model_dump()

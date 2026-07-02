@@ -284,7 +284,7 @@ agent 表现,并把反馈喂回 user_simulator(simulator 仍拍板)。
       "session_name": "exp",
       "rubrics": ["验收准则1", "验收准则2"], // 随 query 冻结,逐条质检;空=自由维度评估
       "eval_step": 2,                     // 每 X 轮评一次;最近 X 轮也作投喂窗口
-      "feedback_to_simulator": true       // 是否把评估反馈回流 simulator
+      "to_simulator": true                // 是否把评估反馈回流 simulator（历史别名 feedback_to_simulator/feedback_to_user）
     }
   }]
 }

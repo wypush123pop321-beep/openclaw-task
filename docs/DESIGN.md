@@ -256,7 +256,7 @@ simulator 发起 ─▶ agent 回复(含 tool_calls/files)
           • 被审查产物推进其 _under_review/ 工作区,用工具就地核验
           • 结构化输出:完成度/改进点/不符合项/倾向 + 引证 + 逐条 rubric → evaluator_use.log
                       │
-                      ▼ 反馈(仅 feedback_to_simulator=true 时回流;不含 rubric 原文)
+                      ▼ 反馈(仅 to_simulator=true 时回流;不含 rubric 原文)
         user_simulator.chat(agent_reply, evaluator_feedback)
           • simulator 参考反馈,仍由它拍板 Task_Done/Failed/继续
 ```
@@ -276,8 +276,8 @@ simulator 发起 ─▶ agent 回复(含 tool_calls/files)
   （核验受阻不判负）。rubric 为可选，缺省即退回自由维度评估。
 - **边界 X**：rubric 原文**只作用于 evaluator**，simulator 不感知 rubric；evaluator 按 rubric
   打分后的提炼反馈（未满足项/改进点）仍回流，逐条 rubric 结果只进 `evaluator_use.log`。
-- **回滚**：`evaluator.enabled=false` 即退回 simulator 自判旧行为；`feedback_to_simulator=false`
-  （默认）则只评估落盘、不影响 simulator 判定。
+- **回滚**：`evaluator.enabled=false` 即退回 simulator 自判旧行为；`to_simulator=false`
+  （默认）则只评估落盘、不影响 simulator 判定。（历史别名 `feedback_to_simulator`/`feedback_to_user`）
 
 相关代码：`trajectory.py`（捕获）、`evaluator.py`（评估）、`openclaw_automation.py`
 中 `execute_queries` 的接入、`system_prompt.md` 的 `{evaluator_feedback}` 占位符。

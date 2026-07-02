@@ -38,6 +38,10 @@ from utils.connection import (
     check_http_health,
 )
 
+# "虚空地址":当 user_dir.path 为空时的临时占位目录。
+# coerce_user_dir 用它重定向空 path;_resolve_evaluate_refs 用它识别"设了 ref 却无有效环境目录"。
+VOID_USER_DIR = os.path.join(tempfile.gettempdir(), "openclaw_void_dir")
+
 
 
 def setup_logger(config_file: Optional[str] = None) -> logging.Logger:
@@ -106,6 +110,14 @@ class UserDirConfig(BaseModel):
     path: str = Field(..., description="用户数据目录路径")
     map_file: Optional[str] = Field(None, description="映射文件名(相对于 path),如 'MAP_Linux',自动补 .json 后缀")
     profile_file: Optional[str] = Field(None, description="用户画像 JSON 文件名(相对于 path),如 'profile_analyzed.json'")
+    user_workspace: Optional[str] = Field(
+        None,
+        description="bulk 数据根子目录(相对 path 的相对路径);缺省回退到 path 目录名(同名子文件夹)",
+    )
+
+    def data_root_subdir(self) -> str:
+        """bulk 数据根的子目录名:显式 user_workspace 优先,否则回退同名子文件夹(path.name)。"""
+        return self.user_workspace or Path(self.path).name
 
 
 class InputDirConfig(BaseModel):
@@ -133,7 +145,7 @@ class InputDirConfig(BaseModel):
         # 2. 核心修改:如果传进来的是字典,且 path 为 null (None)
         if isinstance(v, dict) and v.get('path') is None:
             # 分配一个系统的临时空目录作为"虚空地址"
-            dummy_path = os.path.join(tempfile.gettempdir(), "openclaw_void_dir")
+            dummy_path = VOID_USER_DIR
 
             # 如果这个虚空目录不存在,顺手建一个,防止后续文件系统操作报错
             if not os.path.exists(dummy_path):
@@ -253,7 +265,8 @@ class WorkspaceManager:
         skill_base_dir: Optional[str],
         agent_skills: List[str],
         agent_dir: Optional[str] = None,
-        user_dir: Optional[str] = None
+        user_dir: Optional[str] = None,
+        data_subdir: Optional[str] = None
     ) -> None:
         """设置 Agent 工作空间文件
 
@@ -264,6 +277,7 @@ class WorkspaceManager:
             agent_skills: 该 agent 需要的技能名称列表
             agent_dir: Agent 源文件目录,包含配置文件(如 SOUL.md, USER.md)
             user_dir: 用户数据目录(整体复制到 workspace)
+            data_subdir: bulk 数据根子目录(相对 user_dir);缺省回退 user_dir 目录名(同名子文件夹)
         """
         workspace = self.get_agent_workspace(agent_name)
 
@@ -314,7 +328,7 @@ class WorkspaceManager:
             user_path = Path(user_dir).expanduser()
             logger.debug("check user_path: %s", user_path)
             if user_path.exists() and user_path.is_dir():
-                content_root = user_path / user_path.name
+                content_root = user_path / (data_subdir or user_path.name)
 
                 if not content_root.exists() or not content_root.is_dir():
                     logger.warning("user_dir content root does not exist or is not a directory: %s", content_root)
@@ -732,7 +746,7 @@ async def process_turn(
             "inclination": ev.inclination,
             "rubric_checks": [rc.model_dump() for rc in ev.rubric_checks],
         })
-        if evaluator.feedback_to_simulator:
+        if evaluator.to_simulator:
             return evaluator.format_feedback(ev)
     return None
 
@@ -1172,25 +1186,28 @@ class OpenClawAutomation:
         # 解析 user_dir:有 map_file 则按映射复制,否则整体复制(旧行为)
         user_dir_config = self.config.input_dir.user_dir
         user_dir_path: Optional[str] = None
+        # bulk 数据根子目录:显式 user_workspace 优先,否则回退同名子文件夹(见 UserDirConfig.data_root_subdir)。
+        # 在此统一派生一次并下传 setup_agent_files,避免两处各自重算导致漂移。
+        data_subdir: Optional[str] = None
 
         if user_dir_config:
             user_path = Path(user_dir_config.path).expanduser()
-            content_root = user_path / user_path.name
+            data_subdir = user_dir_config.data_root_subdir()
+            content_root = user_path / data_subdir
 
             if user_dir_config.map_file:
                 # map 模式(copy_map_not_workspace=True):按 map 逐条复制到真实路径。
-                # map 的 key 直接相对 user_dir.path 解析,不再强制走同名子文件夹;
-                # 为兼容旧布局,若同名子文件夹存在则仍以它作数据根。
+                # map 的 key 相对数据根解析,数据根子目录不存在时退回 user_dir.path。
                 data_dir = str(content_root) if content_root.is_dir() else str(user_path)
                 map_path = self._resolve_map_file(user_dir_config.path, user_dir_config.map_file)
                 self.workspace_manager.setup_from_map(map_path, base_dir=data_dir)
             elif content_root.is_dir():
-                # 整体复制模式(copy_map_not_workspace=False):同名子文件夹为数据根,
+                # 整体复制模式(copy_map_not_workspace=False):数据根子目录为数据根,
                 # 顶层留给 MAP/profile 等元数据,bulk 复制时不会混入。
                 user_dir_path = user_dir_config.path
             else:
-                # 无 map_file 且无同名子文件夹:无用户文件树可部署,跳过。
-                logger.warning("user_dir 无 map_file 且同名子文件夹不存在,跳过用户目录部署: %s", content_root)
+                # 无 map_file 且无数据根子目录:无用户文件树可部署,跳过。
+                logger.warning("user_dir 无 map_file 且数据根子目录不存在,跳过用户目录部署: %s", content_root)
 
         for agent_config in self.config.agents:
             self.workspace_manager.setup_agent_files(
@@ -1199,7 +1216,8 @@ class OpenClawAutomation:
                 skill_base_dir=self.config.input_dir.skill_dir,
                 agent_skills=agent_config.skills,
                 agent_dir=self.config.input_dir.agent_dir,
-                user_dir=user_dir_path
+                user_dir=user_dir_path,
+                data_subdir=data_subdir
             )
 
     @staticmethod
@@ -1295,21 +1313,37 @@ def _resolve_json_pointer(data: Any, pointer: str) -> Any:
     return cur
 
 
-def _resolve_evaluate_refs(config: "AutomationConfig", config_dir: Path) -> None:
-    """解引用各 query 的 evaluate 块外部引用,以 config 文件所在目录为相对基准。
+def _resolve_evaluate_refs(config: "AutomationConfig") -> None:
+    """解引用各 query 的 evaluate 块外部引用,以 input_dir.user_dir.path 为相对基准。
 
     - oracle_ref:加载 ground-truth → ev.oracle_data。
     - rubrics_ref:JSON-Pointer 解引用 → ev.structured_rubrics。
     - scoring_ref:JSON-Pointer 解引用 → ev.scoring(唯一评分来源,无隐式兜底)。
     路径/指针缺失显式报错(不静默退空)。最后 resolve_runtime() 合成 scoring_spec。
+
+    引用基准为 user_dir.path:被引用的环境文件(oracle.json/user_queries.json)本就位于
+    该目录内,故 ref 写为相对 user_dir.path 的裸名。若某 query 设了任一 *_ref 却无有效
+    user_dir(为 None 或被重定向到虚空地址),视为配置矛盾,fail-fast 抛 ValueError。
     """
+    user_dir_cfg = config.input_dir.user_dir
+    user_base: Optional[Path] = None
+    if user_dir_cfg and os.path.abspath(user_dir_cfg.path) != os.path.abspath(VOID_USER_DIR):
+        user_base = Path(user_dir_cfg.path).expanduser()
+
     for q in config.queries:
         ev = q.evaluate
         if ev is None:
             continue
 
+        # fail-fast:设了引用却无解析基准(user_dir 缺失/为虚空地址)→ 配置矛盾,显式报错。
+        if (ev.oracle_ref or ev.rubrics_ref or ev.scoring_ref) and user_base is None:
+            raise ValueError(
+                "evaluate.oracle_ref/rubrics_ref/scoring_ref 已设置,"
+                "但 input_dir.user_dir 缺失或为空(虚空地址),无法确定引用解析基准"
+            )
+
         if ev.oracle_ref:
-            op = (config_dir / ev.oracle_ref)
+            op = (user_base / ev.oracle_ref)
             if not op.exists():
                 raise FileNotFoundError(f"evaluate.oracle_ref 不存在: {op}")
             oracle_text = op.read_text(encoding="utf-8")
@@ -1319,7 +1353,7 @@ def _resolve_evaluate_refs(config: "AutomationConfig", config_dir: Path) -> None
 
         if ev.rubrics_ref:
             file_part, _, ptr = ev.rubrics_ref.partition("#")
-            rp = (config_dir / file_part)
+            rp = (user_base / file_part)
             if not rp.exists():
                 raise FileNotFoundError(f"evaluate.rubrics_ref 不存在: {rp}")
             rubrics_text = rp.read_text(encoding="utf-8")
@@ -1332,7 +1366,7 @@ def _resolve_evaluate_refs(config: "AutomationConfig", config_dir: Path) -> None
         if ev.scoring_ref:
             # scoring 唯一来源:显式解析 scoring_ref 指针(与 rubrics_ref 对称),无隐式兜底。
             file_part, _, ptr = ev.scoring_ref.partition("#")
-            sp = (config_dir / file_part)
+            sp = (user_base / file_part)
             if not sp.exists():
                 raise FileNotFoundError(f"evaluate.scoring_ref 不存在: {sp}")
             scoring_text = sp.read_text(encoding="utf-8")
@@ -1377,8 +1411,8 @@ class ConfigLoader:
             data = json.loads(content)
 
         config = AutomationConfig(**data)
-        # evaluate 块外部引用解引用:以 config 文件所在目录为相对基准
-        _resolve_evaluate_refs(config, path.parent)
+        # evaluate 块外部引用解引用:以 input_dir.user_dir.path 为相对基准
+        _resolve_evaluate_refs(config)
         return config
 
     @staticmethod

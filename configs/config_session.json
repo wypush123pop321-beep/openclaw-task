@@ -48,7 +48,7 @@
           "给出该城市为经济中心的依据(如 GDP/金融机构/交易所等)"
         ],
         "eval_step" : 2,
-        "feedback_to_simulator": true
+        "to_simulator": true
       }
     }
   ],

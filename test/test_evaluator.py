@@ -155,12 +155,15 @@ def test_format_feedback_does_not_leak_rubric():
     print("✓ format_feedback 不泄漏 rubric 原文")
 
 
-def test_feedback_to_simulator_switch():
-    """feedback_to_simulator 开关值; 默认 False(安全不回流)。"""
-    assert EvaluateConfig().feedback_to_simulator is False  # 安全默认
-    assert _mk_eval(feedback_to_simulator=True).feedback_to_simulator is True
-    assert _mk_eval(feedback_to_simulator=False).feedback_to_simulator is False
-    print("✓ feedback_to_simulator 开关/默认")
+def test_to_simulator_switch():
+    """to_simulator 开关值; 默认 False(安全不回流);历史别名等价读取。"""
+    assert EvaluateConfig().to_simulator is False  # 安全默认
+    assert _mk_eval(to_simulator=True).to_simulator is True
+    assert _mk_eval(to_simulator=False).to_simulator is False
+    # 历史别名 feedback_to_simulator / feedback_to_user 经 AliasChoices 等价读取
+    assert EvaluateConfig(feedback_to_simulator=True).to_simulator is True
+    assert EvaluateConfig(feedback_to_user=True).to_simulator is True
+    print("✓ to_simulator 开关/默认/别名")
 
 
 def test_no_rubric_normalizes_rubric_checks_empty():
@@ -205,6 +208,6 @@ if __name__ == "__main__":
     test_build_prompt_injects_rubric_when_present()
     test_build_prompt_states_blocked_rule()
     test_format_feedback_does_not_leak_rubric()
-    test_feedback_to_simulator_switch()
+    test_to_simulator_switch()
     test_no_rubric_normalizes_rubric_checks_empty()
     print("\n全部通过 ✅ (test_evaluator)")
