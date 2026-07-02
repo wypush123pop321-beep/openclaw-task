@@ -11,6 +11,7 @@
     "agent_dir": "agents",
     "user_dir": {
       "path": "configs/task_configs_0701/0701_任务管线产物标准模板/environments/08_科研助手_task1_描述统计与相关分析",
+      "user_workspace": "user_files",
       "profile_file": "user_profile_08_经济学硕士生_Stats.json",
       "map_file": "MAP_Windows"
     }
@@ -43,10 +44,10 @@
       "evaluate": {
         "agent_name": "evaluator",
         "eval_step": 1,
-        "feedback_to_simulator": true,
-        "oracle_ref": "../environments/08_科研助手_task1_描述统计与相关分析/oracle.json",
-        "rubrics_ref": "../environments/08_科研助手_task1_描述统计与相关分析/user_queries.json#/0/evaluate/0/custom_rubrics",
-        "scoring_ref": "../environments/08_科研助手_task1_描述统计与相关分析/user_queries.json#/0/evaluate/0/scoring"
+        "to_simulator": true,
+        "oracle_ref": "oracle.json",
+        "rubrics_ref": "user_queries.json#/0/evaluate/0/custom_rubrics",
+        "scoring_ref": "user_queries.json#/0/evaluate/0/scoring"
       }
     }
   ],

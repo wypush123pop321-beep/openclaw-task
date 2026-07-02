@@ -86,7 +86,7 @@ workspace_base: str = Field(r"C:\Users\nianzu\.openclaw\workspace", ...)
     "agent_name": "evaluator",   // 独立 OC agent 名，必须 ≠ 任一执行 agent
     "model": null,               // 评估模型；初期对齐 user_simulator。见下方说明
     "prompt_file": null,         // 评估 system prompt 模板路径；null=内置模板
-    "feedback_to_simulator": false,  // false(默认)=只评估并落盘、不回流 simulator（先观测质量）；true=反馈回流
+    "to_simulator": false,  // false(默认)=只评估并落盘、不回流 simulator（先观测质量）；true=反馈回流。历史别名 feedback_to_simulator/feedback_to_user 仍可读
     "log_evaluations": true,     // 是否把每次评估写入 evaluator_use.log
     "review_subdir": "_under_review"  // 被审查产物推进 evaluator 工作区的子目录
   }
@@ -97,7 +97,7 @@ workspace_base: str = Field(r"C:\Users\nianzu\.openclaw\workspace", ...)
 - `enabled=false` 是回滚开关：关闭后行为与旧版完全一致（仍逐轮捕获 `tool_calls`，但不取磁盘真相、不调裁判）。
 - 首次创建 evaluator agent 会触发一次网关重启等待（约 90s），与创建任何新 agent 一致。
 - `model`：SDK 的 `agents.create` 只下发 `name/workspace`，**不下发模型**，故 evaluator 实际使用网关默认模型；配置该字段仅记录意图并打印告警（待后续网关支持）。
-- `feedback_to_simulator=false`（默认）时，评估只落盘到 `evaluator_use.log`、不影响 simulator 判定；确认评估质量后再切 `true` 起用反馈闭环。（原 `dry_run` 字段已改名,语义相反:`dry_run=true` ≡ `feedback_to_simulator=false`。）
+- `to_simulator=false`（默认）时，评估只落盘到 `evaluator_use.log`、不影响 simulator 判定；确认评估质量后再切 `true` 起用反馈闭环。（字段几经改名:`dry_run`→`feedback_to_simulator`→现 `to_simulator`;`dry_run=true` ≡ `to_simulator=false`。历史别名 `feedback_to_simulator`/`feedback_to_user` 经 AliasChoices 仍可读。）
 
 ### queries[].rubric（验收清单，可选）
 
@@ -193,6 +193,9 @@ python run_paper_analysis.py
 ### 2. user_dir 包含要复制到工作空间的数据文件
 
 所有文件会被复制到 agent 的工作空间，agent 可以直接访问。
+
+- **`user_dir.user_workspace`（可选）**：bulk 模式的数据根子目录（相对 `user_dir.path`）。缺省回退到 `user_dir.path` 目录名（同名子文件夹）。bulk 只复制该子目录内容进 workspace，顶层留给 MAP/profile/oracle 等元数据（天然不进 workspace）。
+- **评估引用基准**：`evaluate.oracle_ref`/`rubrics_ref`/`scoring_ref` 以 `user_dir.path` 为相对基准解析，规范写法为相对该目录的裸名（如 `oracle.json`、`user_queries.json#/0/...`）。设了任一 `*_ref` 却无有效 `user_dir` 时加载期 fail-fast 报错。
 
 ### 3. 不需要在配置中指定 workspace
 
