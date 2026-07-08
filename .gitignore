@@ -1,1 +1,11 @@
-__pycache__/*
+# Python 编译产物(任意层级,不锚定根目录)
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# 运行日志
+logs/
+
+# 编辑器/harness
+.claude/
