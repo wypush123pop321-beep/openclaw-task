@@ -49,7 +49,7 @@ echo "镜像: $IMAGE | repo: $REPO | 任务: ${TASKS[*]} | detach=$DETACH | max_
 for T in "${TASKS[@]}"; do
     name="openclaw-task${T}"
     out="${OUT_BASE}/task${T}"
-    mkdir -p "$out/logs" "$out/workspace" 2>/dev/null || true
+    mkdir -p "$out/logs" "$out/workspace" "$out/agents" 2>/dev/null || true
     docker rm -f "$name" >/dev/null 2>&1 || true
 
     args=(--rm --name "$name"
@@ -59,8 +59,9 @@ for T in "${TASKS[@]}"; do
         -e http_proxy="$PROXY_HTTP" -e https_proxy="$PROXY_HTTPS"
         -e NO_PROXY="$NOPROXY" -e no_proxy="$NOPROXY"
         -v "$REPO:/app"                              # 目标 repo（不同版本随便换）
-        -v "$out/logs:/app/logs"                     # 日志/轨迹落宿主机
-        -v "$out/workspace:/root/.openclaw/workspace")
+        -v "$out/logs:/app/logs"                     # harness 日志 + 合成轨迹
+        -v "$out/workspace:/root/.openclaw/workspace"   # agent 工作空间产物
+        -v "$out/agents:/root/.openclaw/agents")     # openclaw 每 session 原始轨迹(sessions/*.trajectory.jsonl)
 
     if [ "$DETACH" = "1" ]; then
         id=$(docker run -d "${args[@]}" "$IMAGE")

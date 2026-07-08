@@ -48,6 +48,7 @@ services:
       - .:/app                                    # 目标 repo（换版本改这里）
       - ./docker/out/task02/logs:/app/logs
       - ./docker/out/task02/workspace:/root/.openclaw/workspace
+      - ./docker/out/task02/agents:/root/.openclaw/agents   # openclaw 每 session 原始轨迹
 
   task03:
     <<: *common
@@ -62,3 +63,4 @@ services:
       - .:/app
       - ./docker/out/task03/logs:/app/logs
       - ./docker/out/task03/workspace:/root/.openclaw/workspace
+      - ./docker/out/task03/agents:/root/.openclaw/agents   # openclaw 每 session 原始轨迹
