@@ -1,0 +1,64 @@
+# 本地便捷跑 task02 + task03（并发、各自独立网关沙箱）。
+# 任意数量任务用 docker/run_tasks.sh 更方便；本文件只是 compose 版的等价示例。
+#
+# 镜像是「环境层」（openclaw 网关/依赖/配置/key/serper 烧在 /opt/kit），
+# harness 代码在运行时挂载到 /app —— 这里挂本仓库（.）；换 repo 版本改挂载即可。
+#
+# 用法：
+#   docker compose build
+#   docker compose up            # 两个任务并发
+#   docker compose up task02     # 只跑一个
+#
+# 网络：默认 bridge（隔离）。容器访问公网端点走宿主机 HTTP_PROXY/HTTPS_PROXY 透传，
+#   localhost 直连。真实 key（simulator/evaluator/网关/serper）都在镜像 /opt/kit 里。
+
+x-common: &common
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+    args:
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-}
+      PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+      PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
+  image: openclaw-task:latest
+  restart: "no"
+
+x-proxy-env: &proxy-env
+  # 运行时代理：公网端点走代理，localhost 直连
+  HTTP_PROXY: ${HTTP_PROXY:-}
+  HTTPS_PROXY: ${HTTPS_PROXY:-}
+  http_proxy: ${HTTP_PROXY:-}
+  https_proxy: ${HTTPS_PROXY:-}
+  NO_PROXY: "localhost,127.0.0.1,::1"
+  no_proxy: "localhost,127.0.0.1,::1"
+
+services:
+  task02:
+    <<: *common
+    container_name: openclaw-task02
+    environment:
+      <<: *proxy-env
+      TASK: "02"
+      HARNESS: openclaw
+      USER_MAX_TURN: ${USER_MAX_TURN:-3}
+      QUERY_TIMEOUT: ${QUERY_TIMEOUT:-600}
+    volumes:
+      - .:/app                                    # 目标 repo（换版本改这里）
+      - ./docker/out/task02/logs:/app/logs
+      - ./docker/out/task02/workspace:/root/.openclaw/workspace
+
+  task03:
+    <<: *common
+    container_name: openclaw-task03
+    environment:
+      <<: *proxy-env
+      TASK: "03"
+      HARNESS: openclaw
+      USER_MAX_TURN: ${USER_MAX_TURN:-3}
+      QUERY_TIMEOUT: ${QUERY_TIMEOUT:-600}
+    volumes:
+      - .:/app
+      - ./docker/out/task03/logs:/app/logs
+      - ./docker/out/task03/workspace:/root/.openclaw/workspace

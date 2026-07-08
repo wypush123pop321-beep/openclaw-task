@@ -9,3 +9,19 @@ logs/
 
 # 编辑器/harness
 .claude/
+
+# Docker 沙箱：密钥/环境专属/运行产物，不入库（注意 .gitignore 不支持行内注释）
+# 网关配置（含真实 apiKey，make_config.py 从本机生成）
+docker/gateway/openclaw.json
+# device 身份（私钥/token）
+docker/gateway/identity/
+# 企业环境专属公开 CA
+docker/certs/
+# SERPER_API_KEY
+skills/serper-plus/.env
+# 任务运行产物/轨迹
+docker/out/
+
+# 数据集（体积大，不入库）
+dailyclawbench_2026-06-30_tasks/
+dailyclawbench_tasks.zip

@@ -1,0 +1,13 @@
+# openclaw harness 运行所需（从根 requirements.txt 中裁出 openclaw 相关部分，
+# 去掉了仅 claudecode 用的 claude-agent-sdk，减小镜像体积/构建风险）。
+openclaw-sdk==2.1.0
+aiohttp
+
+# 共享依赖（config / simulator / evaluator）
+pydantic>=2,<3
+openai>=1.0
+httpx>=0.27
+pyyaml
+
+# SDK 与网关握手时用 device 私钥做 Ed25519 签名，缺它握手会失败
+cryptography
