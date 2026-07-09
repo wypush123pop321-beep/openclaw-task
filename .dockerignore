@@ -1,0 +1,7 @@
+.git
+**/__pycache__
+*.pyc
+dailyclawbench_tasks.zip
+docker/out
+logs
+*.log

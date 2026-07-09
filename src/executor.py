@@ -283,7 +283,16 @@ async def execute_queries(
                 trajectory, evaluator, agent=agent, before_history=before_history,
             )
 
-            user_reply = query_simulator.chat(agent_reply, evaluator_feedback=evaluator_feedback)
+            # simulator 调用失败(如 API key/端点问题)不应丢弃已采集的轨迹:
+            # 优雅收尾并 break,让循环后的轨迹落盘照常执行。
+            try:
+                user_reply = query_simulator.chat(agent_reply, evaluator_feedback=evaluator_feedback)
+            except Exception as e:  # noqa: BLE001
+                import traceback
+                logger.error("user_simulator 调用失败(Turn %d): %s;终止多轮并保留已采集轨迹", turn, e)
+                logger.debug(traceback.format_exc())
+                trajectory.outcome = "sim_error"
+                break
             logger.debug("[S%d] %s", turn, user_reply)
 
             if "【Task_Done】" in user_reply:
