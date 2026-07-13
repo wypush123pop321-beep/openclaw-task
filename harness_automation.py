@@ -18,6 +18,7 @@ from typing import Any, Dict, Optional
 from user_simulator import User_simulator
 
 from src.config import AutomationConfig, ConfigLoader, load_agent_model_configs
+from src.system_prompt import make_gen_fn, resolve_system_prompt
 
 import time as _time
 _RUN_ID = _time.strftime("%Y%m%dT%H%M%S")
@@ -150,6 +151,30 @@ class HarnessAutomation:
             from src.openclaw_client import OpenclawWorkspaceManager
             self.workspace_manager = OpenclawWorkspaceManager("~/.openclaw/workspace")
 
+    def _evaluator_agent_names(self) -> set:
+        """被任一 query 的 evaluate.agent_name 引用的 agent(视为 evaluator,不做多样性)。"""
+        return {
+            q.evaluate.agent_name
+            for q in self.config.queries
+            if q.evaluate is not None and q.evaluate.agent_name
+        }
+
+    def _resolve_assistant_prompts(self) -> Dict[str, tuple]:
+        """对每个 assistant agent(非 evaluator)解析系统提示词 → {name: (prompt, source)}。
+
+        变异 LLM 复用 simulator 模型;仅当存在开启 auto_gen 的 assistant 时才构建生成器。
+        evaluator agent 不在此列(其 system_prompt 仍走 evaluator 自身路径)。
+        """
+        evaluator_names = self._evaluator_agent_names()
+        assistants = [a for a in self.config.agents if a.name not in evaluator_names]
+        gen_fn = None
+        if any(a.auto_gen_system_prompt for a in assistants):
+            gen_fn = make_gen_fn(self.simulator_model_cfg)
+        resolved: Dict[str, tuple] = {}
+        for a in assistants:
+            resolved[a.name] = resolve_system_prompt(a, gen_fn)
+        return resolved
+
     async def run(self) -> Dict[str, Any]:
         """运行自动化流程"""
         logger.info("=" * 60)
@@ -184,9 +209,10 @@ class HarnessAutomation:
 
             await self._setup_workspaces()
 
+            assistant_prompts = self._resolve_assistant_prompts()
             agent_manager = OpenclawAgentManager(client, self.workspace_manager, agent_overrides=self.agent_overrides)
             for agent_config in self.config.agents:
-                await agent_manager.setup_agent(agent_config)
+                await agent_manager.setup_agent(agent_config, assistant_prompts.get(agent_config.name))
 
             simulator_factory = lambda: create_simulator(self.config, self.simulator_model_cfg)
             agent_system_prompts = {
@@ -200,6 +226,7 @@ class HarnessAutomation:
                 simulator_factory=simulator_factory,
                 max_turn=self.config.user_max_turn,
                 agent_system_prompts=agent_system_prompts,
+                assistant_prompts=assistant_prompts,
                 run_id=_RUN_ID,
                 pre_query_hook=lambda: openclaw_check_readyz(client),
             )
@@ -232,21 +259,24 @@ class HarnessAutomation:
 
             await self._setup_workspaces()
 
+            assistant_prompts = self._resolve_assistant_prompts()
             agent_manager = HermesAgentManager(client, self.workspace_manager, agent_overrides=self.agent_overrides)
             for agent_config in self.config.agents:
-                await agent_manager.setup_agent(agent_config)
+                await agent_manager.setup_agent(agent_config, assistant_prompts.get(agent_config.name))
 
             simulator_factory = lambda: create_simulator(self.config, self.simulator_model_cfg)
             agent_system_prompts = {
                 a.name: a.system_prompt for a in self.config.agents if a.system_prompt
             }
+            # Hermes 的 agent 在 get_agent 时惰性构造,故 deliver 收在 manager 里、工厂取用
             results = await execute_queries(
                 queries=self.config.queries,
                 client=client,
-                get_agent_fn=make_hermes_get_agent(client, workspace_manager=self.workspace_manager, agent_overrides=self.agent_overrides),
+                get_agent_fn=make_hermes_get_agent(client, workspace_manager=self.workspace_manager, agent_overrides=self.agent_overrides, system_prompts=agent_manager.system_prompts),
                 execute_with_retry_fn=make_hermes_execute_with_retry(client, workspace_manager=self.workspace_manager),
                 simulator_factory=simulator_factory,
                 agent_system_prompts=agent_system_prompts,
+                assistant_prompts=assistant_prompts,
                 max_turn=self.config.user_max_turn,
                 run_id=_RUN_ID,
             )
@@ -279,9 +309,10 @@ class HarnessAutomation:
 
             await self._setup_workspaces()
 
+            assistant_prompts = self._resolve_assistant_prompts()
             agent_manager = ClaudecodeAgentManager(client, self.workspace_manager, agent_overrides=self.agent_overrides)
             for agent_config in self.config.agents:
-                await agent_manager.setup_agent(agent_config)
+                await agent_manager.setup_agent(agent_config, assistant_prompts.get(agent_config.name))
 
             simulator_factory = lambda: create_simulator(self.config, self.simulator_model_cfg)
             agent_system_prompts = {
@@ -294,6 +325,7 @@ class HarnessAutomation:
                 execute_with_retry_fn=make_claudecode_execute_with_retry(client, workspace_manager=self.workspace_manager),
                 simulator_factory=simulator_factory,
                 agent_system_prompts=agent_system_prompts,
+                assistant_prompts=assistant_prompts,
                 max_turn=self.config.user_max_turn,
                 run_id=_RUN_ID,
             )

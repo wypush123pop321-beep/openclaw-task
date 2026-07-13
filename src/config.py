@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.evaluator.evaluator import EvaluateConfig, Rubric
 
@@ -71,6 +71,10 @@ class AgentConfigItem(BaseModel):
     config: List[str] = Field(default_factory=list, description="配置文件列表,如 USER.md, SOUL.md")
     skills: List[str] = Field(default_factory=list, description="所需技能列表")
     system_prompt: Optional[str] = Field(None, description="系统提示词")
+    auto_gen_system_prompt: bool = Field(
+        False,
+        description="开启后由 LLM 以 system_prompt(或内置默认)为 base 改写出多样变体作为该 agent 的系统提示词;默认 False,未配置不影响现有行为。仅对被测 assistant 生效,禁止对 evaluator 开启。",
+    )
     model: Optional[str] = Field(None, description="使用的模型")
 
 
@@ -167,6 +171,30 @@ class AutomationConfig(BaseModel):
         if url.startswith(("ws://", "wss://")) and "/gateway" not in url:
             return url.rstrip("/") + "/gateway"
         return url
+
+    @model_validator(mode="after")
+    def _reject_auto_gen_on_evaluator(self) -> "AutomationConfig":
+        """D7:多样性仅限 assistant。凡被任一 query 的 evaluate.agent_name 引用的
+        agent(即 evaluator agent),禁止开启 auto_gen_system_prompt——变异会污染 reward。
+        校验期(配置加载即触发)fail-fast,错误信息带 agent 名与冲突字段。
+        """
+        evaluator_names = {
+            q.evaluate.agent_name
+            for q in self.queries
+            if q.evaluate is not None and q.evaluate.agent_name
+        }
+        offenders = [
+            a.name
+            for a in self.agents
+            if a.auto_gen_system_prompt and a.name in evaluator_names
+        ]
+        if offenders:
+            raise ValueError(
+                "auto_gen_system_prompt=true 不允许配置在 evaluator agent 上"
+                f"(被 query.evaluate.agent_name 引用): {offenders};"
+                "该能力仅作用于被测 assistant,变异 evaluator 会污染 reward 信号"
+            )
+        return self
 
 
 # ============================================================================
