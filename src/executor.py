@@ -175,6 +175,7 @@ async def execute_queries(
     simulator_factory: Optional[Callable[[], Optional[User_simulator]]] = None,
     max_turn: int = 5,
     agent_system_prompts: Optional[Dict[str, str]] = None,
+    assistant_prompts: Optional[Dict[str, tuple]] = None,
     run_id: str = "",
     pre_query_hook: Optional[Callable[[], Awaitable[None]]] = None,
 ) -> Dict[str, Any]:
@@ -233,6 +234,10 @@ async def execute_queries(
 
         # 能力1:逐轮累积带证据的轨迹
         trajectory = Trajectory(query=query_text, agent_name=query.agent_name)
+        # 溯源:落盘实际下发给 assistant 的系统提示词 + 来源(RL 样本标签)
+        _asst_prompt = (assistant_prompts or {}).get(query.agent_name)
+        if _asst_prompt is not None:
+            trajectory.assistant_system_prompt, trajectory.system_prompt_source = _asst_prompt
         # 能力2:per-query 构建持久 evaluator(无 evaluate 块则为 None);rubric/eval_step 取自该块。
         eval_sys_prompt = None
         if query.evaluate is not None:

@@ -77,6 +77,9 @@ class Trajectory(BaseModel):
     """一个 query 的完整运行记录(可落盘为 RL 样本:轨迹 + 各评审点评分)。"""
     query: str
     agent_name: str
+    # 实际下发给 assistant 的系统提示词全文及其来源("auto_gen" | "config" | "default"),作为 RL 样本标签
+    assistant_system_prompt: Optional[str] = None
+    system_prompt_source: Optional[str] = None
     turns: list[TurnRecord] = Field(default_factory=list)
     outcome: Optional[str] = None  # "done" | "failed" | "max_turn"
     # 各评审点的评分结果(逐条 0/1、gate 状态、分桶得分、completion(0~1)、所在 turn);终局评审点的 completion 即最终成绩
