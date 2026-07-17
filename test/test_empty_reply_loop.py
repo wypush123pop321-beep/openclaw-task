@@ -73,12 +73,12 @@ def test_extract_reply_fallback_reasoning():
     print("   ✓", repr(reply))
 
 
-def test_all_empty_falls_back_to_done():
-    print("2) content+reasoning 全空,重试仍空 → 兜底 Task_Done,永不空串")
+def test_all_empty_falls_back_to_failed():
+    print("2) content+reasoning 全空,重试3次仍空 → 判 Task_Failed,永不空串")
     sim = _make_simulator([_Resp(_Msg(content="")) for _ in range(3)])
     reply = sim.chat("agent said something")
     assert reply.strip(), "chat() 不得返回空串"
-    assert "【Task_Done】" in reply, f"应兜底收尾标记, 实得 {reply!r}"
+    assert "【Task_Failed】" in reply, f"应判失败标记, 实得 {reply!r}"
     print("   ✓", repr(reply))
 
 
@@ -90,24 +90,25 @@ def test_normal_content_unchanged():
     print("   ✓", repr(reply))
 
 
-def test_executor_empty_reply_is_finalize():
-    print("4) executor: 空 user_reply 判定逻辑等价 Task_Done(不下发空消息)")
-    # 复刻 executor 中的判定分支语义,断言"空即收尾"这一契约。
+def test_executor_empty_reply_is_failed():
+    print("4) executor: 空 user_reply 判为失败(不下发空消息)")
+    # 复刻 executor 中的判定分支语义,断言"空即失败"这一契约(纵深防御,与 simulator 层一致)。
     def decide(user_reply):
         if not (user_reply or "").strip():
-            return "done"  # 收尾,break,不赋 current_query
+            return "failed"  # 判失败,break,不赋 current_query
         if "【Task_Done】" in user_reply:
             return "done"
         if "【Task_Failed】" in user_reply:
             return "failed"
         return "continue"
 
-    assert decide("") == "done"
-    assert decide("   \n ") == "done"
-    assert decide(None) == "done"
+    assert decide("") == "failed"
+    assert decide("   \n ") == "failed"
+    assert decide(None) == "failed"
     assert decide("继续问点别的") == "continue"
     assert decide("【Task_Done】") == "done"
-    print("   ✓ 空/空白/None 均判收尾, 非空正常继续")
+    assert decide("【Task_Failed】") == "failed"
+    print("   ✓ 空/空白/None 均判失败, 非空正常继续")
 
 
 def test_client_message_required_fast_fail():
@@ -126,9 +127,9 @@ def test_client_message_required_fast_fail():
 if __name__ == "__main__":
     tests = [
         test_extract_reply_fallback_reasoning,
-        test_all_empty_falls_back_to_done,
+        test_all_empty_falls_back_to_failed,
         test_normal_content_unchanged,
-        test_executor_empty_reply_is_finalize,
+        test_executor_empty_reply_is_failed,
         test_client_message_required_fast_fail,
     ]
     print("=" * 60)

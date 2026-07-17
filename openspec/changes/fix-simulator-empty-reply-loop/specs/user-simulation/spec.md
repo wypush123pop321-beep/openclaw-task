@@ -2,11 +2,11 @@
 
 ### Requirement: 仿真用户返回值健壮性
 
-`user_simulator.chat()` SHALL NOT 返回空字符串。当底层模型（含 reasoning 类模型经 OpenAI 兼容接口）返回的主文本通道（`choices[0].message.content`）为空时，simulator SHALL 依次尝试以下兜底，直到得到非空文本或显式收尾标记：
+`user_simulator.chat()` SHALL NOT 返回空字符串。当底层模型（含 reasoning 类模型经 OpenAI 兼容接口）返回的主文本通道（`choices[0].message.content`）为空时，simulator SHALL 依次尝试以下兜底，直到得到非空文本或显式失败标记：
 
 1. 回退读取 reasoning 文本通道（如 `reasoning_content` 等模型返回体中承载思考/最终文本的备用字段）；
-2. 若仍为空，SHALL 以相同输入有限次重试模型调用（复用既有的调用重试上限）；
-3. 若重试后仍为空，SHALL 返回一个显式的收尾标记（`【Task_Done】` 语义），MUST NOT 返回空串或纯空白。
+2. 若仍为空，SHALL 以相同输入有限次重试模型调用（复用既有的调用重试上限，即 3 次）；
+3. 若重试 3 次后仍为空，SHALL 判定为 simulator 自身故障，返回显式的失败标记（`【Task_Failed】` 语义），MUST NOT 返回空串或纯空白。将连续吐不出内容判为失败而非完成，是为了避免虚高成功率、掩盖 simulator 故障。
 
 该健壮性约束仅治理 `chat()` 的返回值契约，不改变仿真用户的判定策略与脱敏策略。
 
@@ -20,7 +20,7 @@
 - **WHEN** 首次调用主 content 与 reasoning 通道均为空
 - **THEN** simulator 以相同输入有限次重试模型调用
 
-#### Scenario: 重试仍为空时兜底为收尾标记
+#### Scenario: 重试仍为空时判为失败
 
-- **WHEN** 达到重试上限后仍未取得任何非空文本
-- **THEN** `chat()` 返回含 `【Task_Done】` 语义的显式收尾标记，MUST NOT 返回空串或纯空白
+- **WHEN** 达到重试上限（3 次）后仍未取得任何非空文本
+- **THEN** `chat()` 返回含 `【Task_Failed】` 语义的显式失败标记，MUST NOT 返回空串或纯空白

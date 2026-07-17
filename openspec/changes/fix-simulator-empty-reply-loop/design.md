@@ -27,12 +27,12 @@
 根因在 simulator（层 1），但 executor（层 2）与 client（层 3）的缺陷各自独立、都会把小问题放大。三层叠加后，任一层的回归都不会再重演一小时空转。
 - 备选：只修 simulator。否决——若未来别的路径也产生空 query，层 2/3 仍会空转；防御性冗余在无人值守批跑里价值高。
 
-**决策 2：simulator 取值顺序 = 主 content → reasoning 字段 → 重试 → 收尾兜底。**
-优先主 content（正常路径不变）；空则回退 reasoning 文本通道；仍空复用 `chat()` 既有的 3 次调用重试；重试仍空返回 `【Task_Done】` 语义标记而非空串或抛异常。
-- 选收尾（Task_Done）而非失败（Task_Failed）兜底：空 content 往往出现在 agent 已交付、simulator "无话可说" 之后（task03 即如此，agent 首轮已交付合格产物）；默认收尾比默认失败更贴近真实且不误伤已完成任务。
+**决策 2：simulator 取值顺序 = 主 content → reasoning 字段 → 重试 → 失败兜底。**
+优先主 content（正常路径不变）；空则回退 reasoning 文本通道；仍空复用 `chat()` 既有的 3 次调用重试；重试 3 次仍空返回 `【Task_Failed】` 语义标记而非空串或抛异常。
+- 选失败（Task_Failed）而非完成（Task_Done）兜底：simulator 连续 3 次吐不出任何内容（主 content + reasoning 均空）= 其自身故障，不是"任务完成"。判失败比判完成诚实——判完成会把 simulator 故障计为成功、虚高成功率、掩盖问题；判失败则如实暴露这轮 simulator 未正常产出。
 
 **决策 3：executor 空 `user_reply` 判定放在赋值 `current_query` 之前。**
-在 `chat()` 返回后立即判空。空则按 `Task_Done` 收尾（与决策 2 的兜底同义，双保险）。这是最靠上游的拦截点，即使 simulator 兜底失效也能挡住。
+在 `chat()` 返回后立即判空。空则判 `failed`（与决策 2 的失败兜底同义，双保险）。这是最靠上游的拦截点，即使 simulator 兜底失效也能挡住，且语义一致——空回复=simulator 故障=失败。
 
 **决策 4：client 侧按错误消息特征分流，而非新增异常类型。**
 `message or attachment required` 是网关对非法请求的确定性拒绝。在 `except (GatewayError, asyncio.TimeoutError)` 分支内先辨识该特征（消息体匹配），命中则立即上抛、跳过 fallback 与重试计数；其余仍走既有连接类处置。
@@ -40,8 +40,8 @@
 
 ## Risks / Trade-offs
 
-- [reasoning 字段命名因供应商而异] → 取值兜底按已知字段名（如 `reasoning_content`）+ 宽松读取（getattr/dict 兼容），取不到即视为空、继续走重试/收尾，不因字段缺失抛错。
-- [默认收尾可能把"本该继续"的轮次提前结束] → 仅在 content + reasoning + 重试全空时才兜底收尾，属极端退化路径；正常有内容的轮次不受影响。
+- [reasoning 字段命名因供应商而异] → 取值兜底按已知字段名（如 `reasoning_content`）+ 宽松读取（getattr/dict 兼容），取不到即视为空、继续走重试/失败兜底，不因字段缺失抛错。
+- [判失败可能把偶发单次空吐误计为失败] → 仅在 content + reasoning + 连续 3 次重试全空时才判失败，属极端退化路径；正常有内容的轮次不受影响。相比误判为完成（掩盖故障），误判为失败更安全、更易在结果里暴露。
 - [按错误消息字符串匹配较脆弱，网关文案变动会失配] → 匹配失配时退化为现状（走 fallback），不会比修复前更差；用稳定子串匹配并加注释标注来源。
 
 ## Migration Plan

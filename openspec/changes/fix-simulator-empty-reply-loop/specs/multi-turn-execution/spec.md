@@ -4,17 +4,17 @@
 
 多轮查询循环在取得 simulator 回复（`user_reply`）后、将其作为下一轮 `current_query` 下发给执行 agent / 网关之前，SHALL 判定该回复是否为空（空串或纯空白）。空回复 MUST NOT 被原样下发给下游网关。
 
-遇空回复时，执行循环 SHALL 采取以下之一：视作收尾（`Task_Done` 语义、结束本查询并正常落盘轨迹），或触发有限次重试（与既有 agent 空回复防护对称、不超过既定重试上限）。该防护与既有的 agent 空回复防护形成对称，二者缺一不可。
+遇空回复时，执行循环 SHALL 判定为失败（`failed` outcome、结束本查询并正常落盘轨迹），MUST NOT 判为完成。空回复表示 simulator 未正常产出（其自身故障），判失败而非完成可避免虚高成功率、掩盖故障。simulator 层已保证重试仍空时返回 `【Task_Failed】`，此处为纵深防御：任何来源的空回复都判失败。
 
 #### Scenario: simulator 返回空回复时不下发空消息
 
 - **WHEN** 某轮 simulator 回复为空串或纯空白
 - **THEN** 执行循环 MUST NOT 以该空回复作为 `current_query` 调用下游网关
 
-#### Scenario: 空回复触发收尾并正常落盘
+#### Scenario: 空回复判为失败并正常落盘
 
-- **WHEN** simulator 空回复被判定为收尾
-- **THEN** 本查询按 `Task_Done` 语义结束，且已采集的轨迹按既有落盘逻辑正常写出（不被拖延或丢失）
+- **WHEN** simulator 空回复被判定
+- **THEN** 本查询按 `failed` outcome 结束，且已采集的轨迹按既有落盘逻辑正常写出（不被拖延或丢失）
 
 ### Requirement: 确定性非法请求快速失败
 
