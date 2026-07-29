@@ -22,6 +22,20 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger("openclaw_automation")
 
+# 工具返回值(output)入库截断上限(字符)。采集时即截,使落盘轨迹 == 喂给 evaluator 的内容
+# (可直接查轨迹核对 evaluator 实际所见);同时避免"全历史 tool_call"投喂时上下文超长。
+# assistant 的完整原始轨迹另由网关 chat_history 留存,此处截断不损失可追溯性。
+TOOL_OUTPUT_MAX_CHARS = 100
+
+
+def _truncate_output(output: Optional[str]) -> Optional[str]:
+    """把工具 output 截断到 TOOL_OUTPUT_MAX_CHARS;超长时附极简省略标记以示截断。"""
+    if output is None:
+        return None
+    if len(output) <= TOOL_OUTPUT_MAX_CHARS:
+        return output
+    return output[:TOOL_OUTPUT_MAX_CHARS] + f"…[+{len(output) - TOOL_OUTPUT_MAX_CHARS}字]"
+
 # OpenClaw 新建 agent 时铺设的脚手架文件;发现工作区新产物时排除这些,
 # 以便把 agent 本轮真正"创建"的文件 surface 给 evaluator。
 SCAFFOLDING_FILES = {
@@ -263,7 +277,9 @@ def extract_tool_calls(messages: list[dict[str, Any]]) -> list[ToolCallEvidence]
                 output = _block_text(res.get("content"))
                 if res.get("isError"):
                     output = f"[error] {output}"
-            calls.append(ToolCallEvidence(tool=name, input=input_val, output=output))
+            calls.append(
+                ToolCallEvidence(tool=name, input=input_val, output=_truncate_output(output))
+            )
     return calls
 
 
@@ -285,7 +301,7 @@ def build_turn_record(
             ToolCallEvidence(
                 tool=tc.tool,
                 input=_normalize_input(tc.input),
-                output=tc.output,
+                output=_truncate_output(tc.output),
                 duration_ms=getattr(tc, "duration_ms", None),
             )
             for tc in (getattr(result, "tool_calls", None) or [])
