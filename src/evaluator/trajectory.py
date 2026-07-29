@@ -121,6 +121,24 @@ class Trajectory(BaseModel):
             return "（暂无轮次）"
         return "\n\n".join(_render_turn_compact(t) for t in turns)
 
+    def render_all_tool_calls(self) -> str:
+        """渲染**全程**工具调用汇总(跨所有轮次,不受评审窗口限制)。
+
+        供 evaluator 判定"曾经调用过某工具"这类跨轮 rubric:某工具可能在更早轮次
+        已调用,若只看最近 window 轮会漏判为负(bug: evaluator 仅看最近 X 轮 tool_call)。
+        output 已在采集时截断至 TOOL_OUTPUT_MAX_CHARS,此处直接内联不再二次截断。
+        """
+        lines: list[str] = []
+        for t in self.turns:
+            for tc in t.tool_calls:
+                out = tc.output or ""
+                lines.append(
+                    f"- [Turn {t.turn}] {tc.tool}(input={_fmt_input(tc.input, 300)}) -> {out}"
+                )
+        if not lines:
+            return "（全程无工具调用记录）"
+        return "\n".join(lines)
+
     def generated_file_pointers(self) -> list[dict]:
         """累积全部产物的指针 {filename, workspace_path}(去重按 name,后出现覆盖)。
 

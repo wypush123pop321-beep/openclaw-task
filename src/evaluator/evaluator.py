@@ -555,6 +555,13 @@ class Evaluator:
         文案全部外置到 evaluator_user_prompt.md(_SECTIONS);本方法只做「算占位符值 +
         选片段(无则置空串)+ 一条 replace 链」,不内联成段提示词。
         """
+        # 全程工具调用汇总:跨所有轮次(不受 window 限制),供"曾调用过某工具"类 rubric 跨轮判定。
+        all_tool_calls_section = "\n\n" + (
+            _SECTIONS["all_tool_calls"]
+            .replace("{window}", str(window))
+            .replace("{all_tool_calls}", trajectory.render_all_tool_calls())
+        )
+
         # 产物文件片段:无产物→空串;有则前置空行与正文隔开。
         file_pointers = trajectory.generated_file_pointers()
         if file_pointers:
@@ -594,6 +601,7 @@ class Evaluator:
 
         # 一条 replace 链:结构占位符与已构造好的片段先填,自由文本(可能偶含 `{…}` 字面)最后填,
         # 避免被二次替换(同 user_simulator._render 的既有取舍)。
+        # all_tool_calls_section 内含工具入参/返回(最易夹带 `{…}` 字面),放到最末尾替换。
         return (
             _SECTIONS["skeleton"]
             .replace("{window}", str(window))
@@ -602,6 +610,7 @@ class Evaluator:
             .replace("{system_prompt}", self._prompt_template)
             .replace("{origin_query}", trajectory.query)
             .replace("{recent_evidence}", trajectory.render_recent(window))
+            .replace("{all_tool_calls_section}", all_tool_calls_section)
         )
 
     def _log(
