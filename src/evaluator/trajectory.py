@@ -22,19 +22,10 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger("openclaw_automation")
 
-# 工具返回值(output)入库截断上限(字符)。采集时即截,使落盘轨迹 == 喂给 evaluator 的内容
-# (可直接查轨迹核对 evaluator 实际所见);同时避免"全历史 tool_call"投喂时上下文超长。
-# assistant 的完整原始轨迹另由网关 chat_history 留存,此处截断不损失可追溯性。
-TOOL_OUTPUT_MAX_CHARS = 100
-
-
-def _truncate_output(output: Optional[str]) -> Optional[str]:
-    """把工具 output 截断到 TOOL_OUTPUT_MAX_CHARS;超长时附极简省略标记以示截断。"""
-    if output is None:
-        return None
-    if len(output) <= TOOL_OUTPUT_MAX_CHARS:
-        return output
-    return output[:TOOL_OUTPUT_MAX_CHARS] + f"…[+{len(output) - TOOL_OUTPUT_MAX_CHARS}字]"
+# 注:tool output 不再于采集时截断——完整轨迹(全部轮次、未截断 tool_call/output)整体
+# 落盘为轨迹文件,并在评估时推进 evaluator 工作区供其按需读取(见 Evaluator._push_trajectory_file)。
+# 这样既不丢证据,又把"全程 tool_call"从 prompt 内联挪到文件按需查阅,缓解上下文长度压力。
+# prompt 内联部分(最近窗口 render_recent / 全程 fallback)各自有渲染期长度上限,不受此影响。
 
 # OpenClaw 新建 agent 时铺设的脚手架文件;发现工作区新产物时排除这些,
 # 以便把 agent 本轮真正"创建"的文件 surface 给 evaluator。
@@ -121,17 +112,23 @@ class Trajectory(BaseModel):
             return "（暂无轮次）"
         return "\n\n".join(_render_turn_compact(t) for t in turns)
 
-    def render_all_tool_calls(self) -> str:
+    def render_all_tool_calls(self, output_limit: int = 200) -> str:
         """渲染**全程**工具调用汇总(跨所有轮次,不受评审窗口限制)。
 
         供 evaluator 判定"曾经调用过某工具"这类跨轮 rubric:某工具可能在更早轮次
         已调用,若只看最近 window 轮会漏判为负(bug: evaluator 仅看最近 X 轮 tool_call)。
-        output 已在采集时截断至 TOOL_OUTPUT_MAX_CHARS,此处直接内联不再二次截断。
+
+        仅作**内联兜底**:优先把完整轨迹文件推进 evaluator 工作区供其按需读取
+        (见 Evaluator._push_trajectory_file);无 gateway(Hermes/ClaudeCode)推不了文件时
+        才退回此内联清单。因采集侧已不再截断 output,这里在**渲染期**对每条 output 设上限
+        (output_limit),避免全程未截断内容整段内联撑爆上下文。
         """
         lines: list[str] = []
         for t in self.turns:
             for tc in t.tool_calls:
                 out = tc.output or ""
+                if len(out) > output_limit:
+                    out = out[:output_limit] + f"…[+{len(out) - output_limit}字]"
                 lines.append(
                     f"- [Turn {t.turn}] {tc.tool}(input={_fmt_input(tc.input, 300)}) -> {out}"
                 )
@@ -296,7 +293,7 @@ def extract_tool_calls(messages: list[dict[str, Any]]) -> list[ToolCallEvidence]
                 if res.get("isError"):
                     output = f"[error] {output}"
             calls.append(
-                ToolCallEvidence(tool=name, input=input_val, output=_truncate_output(output))
+                ToolCallEvidence(tool=name, input=input_val, output=output)
             )
     return calls
 
@@ -319,7 +316,7 @@ def build_turn_record(
             ToolCallEvidence(
                 tool=tc.tool,
                 input=_normalize_input(tc.input),
-                output=_truncate_output(tc.output),
+                output=tc.output,
                 duration_ms=getattr(tc, "duration_ms", None),
             )
             for tc in (getattr(result, "tool_calls", None) or [])

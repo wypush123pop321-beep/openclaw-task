@@ -55,23 +55,6 @@ def _parse_json_as(text: str, model: Type[_T]) -> _T:
     return model.model_validate(_loads_lenient(m.group(1) if m.lastindex else m.group(0)))
 
 
-def _fallback_eval_result() -> "EvaluationResult":
-    """解析彻底失败(平凡修复 + 裸 LLM 修复都无效)时的安全占位裁决。
-
-    目的:evaluator **确实产出了**评估、只是格式坏了——绝不能静默丢弃、让本轮反馈凭空消失
-    (bug: score 识别失败则反馈不回流)。这里合成一条不含任何具体错处/答案的通用提示回流
-    simulator,既保证"有评估必回流"、对话不中断,又零泄漏风险(不去 regex 抓破损 JSON 里的
-    字段,避免引入脆弱逻辑)。completion=None 表示"未评估",绝不因格式问题给 agent 判 0 分。
-    """
-    return EvaluationResult(
-        completion=None,
-        inclination="uncertain",
-        reason="本轮第三方评估的输出格式非法且自动修复未成功,未能得到结构化评估结果;"
-               "本轮无可用评估,请你自行依据对话内容与已知信息判断是否继续或结束。",
-        task_declared_complete=True,
-    )
-
-
 # 评估日志,仿 api_use.log,每行一条 JSON(供离线复核与校准)
 eval_logger = logging.getLogger("evaluator_use")
 eval_logger.setLevel(logging.INFO)
@@ -416,45 +399,6 @@ class Evaluator:
         # 确定性评分聚合器:由 ScoringSpec 驱动 (∏gate)×Σ桶加权;completion 由它算出而非模型自报
         spec = config.scoring_spec or ScoringSpec.from_scoring(config.scoring, config.rubric_items())
         self.scorer = Scorer(spec)
-        # 可选的裸 LLM JSON 修复器(evaluator 输出非法 JSON 时兜底纠正);由 harness 注入
-        # simulator 的低成本 LLM(见 set_json_repair_fn),未注入则跳过该级修复。
-        self._json_repair_fn: Optional[Callable[[str], str]] = None
-
-    def set_json_repair_fn(self, fn: Optional[Callable[[str], str]]) -> None:
-        """注入裸 LLM JSON 修复器:入参为疑似非法 JSON 文本,返回修正后的文本。
-
-        由 harness 传入 simulator 的 `repair_json`——复用其 LLM 低成本纠正 evaluator 偶发的
-        非法 JSON,避免重跑昂贵的 evaluator agent。
-        """
-        self._json_repair_fn = fn
-
-    def _parse_with_repair(self, raw: str) -> Optional[EvaluationResult]:
-        """解析 evaluator 原始输出为 EvaluationResult,两级递进,全失败返回 None。
-
-        1) 平凡解析:`_parse_json_as`(含去围栏 + 无损去尾逗号);覆盖绝大多数情况。
-        2) 裸 LLM 修复一次:把原文交给注入的低成本 LLM 纠正语法后再解析——专治"漏逗号"
-           这类平凡修复不敢猜补的错(猜补会误伤字符串,故交给模型而非脆弱正则)。
-        两级都失败返回 None,由调用方合成安全占位反馈兜底。
-        """
-        try:
-            return _parse_json_as(raw, EvaluationResult)
-        except Exception as e:  # noqa: BLE001
-            logger.debug("evaluator 输出平凡解析失败,尝试裸 LLM 修复: %s", e)
-
-        if self._json_repair_fn is None:
-            return None
-        try:
-            fixed = self._json_repair_fn(raw)
-        except Exception as e:  # noqa: BLE001
-            logger.debug("裸 LLM 修复调用异常: %s", e)
-            return None
-        if not fixed or fixed == raw:
-            return None
-        try:
-            return _parse_json_as(fixed, EvaluationResult)
-        except Exception as e:  # noqa: BLE001
-            logger.debug("裸 LLM 修复后仍解析失败: %s", e)
-            return None
 
     @classmethod
     def create(
@@ -511,9 +455,12 @@ class Evaluator:
 
         # 投递(b):把磁盘真相文件推进 evaluator 自己的工作区,供其用工具就地核验
         await self._push_review_files(current_turn)
+        # 投递(b'):把完整轨迹(全部轮次、未截断 tool_call/output)推进工作区,供 evaluator 按需读取,
+        # 替代把全程 tool_call 整段内联进 prompt(缓解上下文长度压力);推不了则回退内联汇总。
+        trajectory_file = await self._push_trajectory_file(trajectory)
 
         # 投递(a):origin_query + rubrics + 最近 window 轮 + 产物指针(不投全量历史/不投自身旧判词)
-        prompt = self._build_prompt(trajectory, rubric, window)
+        prompt = self._build_prompt(trajectory, rubric, window, trajectory_file=trajectory_file)
         prompt_chars = len(prompt)  # token 代理量,供 eval_step 实验对比开销
 
         # 直接复用各 client 的 agent.execute:追加 schema 后缀 → 解析 JSON。
@@ -533,24 +480,13 @@ class Evaluator:
         )
         try:
             resp = await eval_agent.execute(prompt + schema_suffix)
+            result = _parse_json_as(resp.content, EvaluationResult)
         except Exception as e:  # noqa: BLE001
-            # agent 执行本身失败(网关/超时等):无输出可修,安全降级为 None(不阻断任务)。
-            logger.warning("evaluator 第 %d 轮执行失败: %s", current_turn.turn, e)
+            # 执行或解析失败:安全降级为 None(不阻断任务)。格式健壮性靠 schema_suffix/
+            # DEFAULT_EVAL_PROMPT 的强约束 + _parse_json_as 的无损平凡修复(去围栏/尾逗号)从源头保证。
+            logger.warning("evaluator 第 %d 轮评估失败: %s", current_turn.turn, e)
             self._log(trajectory, current_turn, None, error=str(e), window=window, prompt_chars=prompt_chars)
             return None
-
-        raw = resp.content or ""
-        result = self._parse_with_repair(raw)
-        if result is None:
-            # 平凡修复 + 裸 LLM 修复都失败 → 合成安全占位反馈回流(有评估必回流,绝不静默丢)。
-            # 无 rubric_checks → 跳过下方评分归一,completion 保持 None,直接落盘并返回。
-            logger.warning("evaluator 第 %d 轮输出无法解析为合法 JSON,回流安全占位反馈", current_turn.turn)
-            result = _fallback_eval_result()
-            self._log(
-                trajectory, current_turn, result,
-                error=f"parse_failed: {raw[:200]}", window=window, prompt_chars=prompt_chars,
-            )
-            return result
 
         # 确定性归一:无冻结 rubric、或本轮执行中(未交付)时,不评分——强制清空 rubric_checks
         # 且 completion=None(未评估,区别于"评估后判 0")。兜住模型自拟准则/未交付仍评分的幻觉。
@@ -628,6 +564,26 @@ class Evaluator:
         except Exception as e:  # noqa: BLE001
             logger.debug("evaluator 会话 reset 失败(降级继续): %s", e)
 
+    async def _push_trajectory_file(self, trajectory: Trajectory) -> Optional[str]:
+        """把当前完整轨迹(全部轮次、未截断 tool_call/output)推进 evaluator 工作区。
+
+        返回工作区相对路径供提示词引用;无 gateway 或推送失败则返回 None(回退内联全程汇总)。
+        动机(检视意见):既然已有完整轨迹,不必把全程 tool_call 整段内联进 prompt——
+        以文件按需查阅替代,显著缓解上下文长度压力,且证据不因截断而丢失。
+        """
+        gateway = getattr(self.client, "gateway", None)
+        if gateway is None:
+            return None
+        dest = f"{self.config.review_subdir}/trajectory.json"
+        try:
+            await gateway.agents_files_set(
+                self.config.agent_name, dest, trajectory.model_dump_json(indent=2)
+            )
+            return dest
+        except Exception as e:  # noqa: BLE001
+            logger.debug("推进轨迹文件失败,回退内联全程汇总: %s", e)
+            return None
+
     async def _push_review_files(self, turn: TurnRecord) -> None:
         gateway = getattr(self.client, "gateway", None)
         if gateway is None:
@@ -646,6 +602,7 @@ class Evaluator:
         trajectory: Trajectory,
         rubric: Optional[list[Rubric]] = None,
         window: int = 1,
+        trajectory_file: Optional[str] = None,
     ) -> str:
         """构建压缩投喂:origin_query + 最近 window 轮(含 tool_calls)+ 产物指针 + rubrics。
 
@@ -655,11 +612,20 @@ class Evaluator:
         文案全部外置到 evaluator_user_prompt.md(_SECTIONS);本方法只做「算占位符值 +
         选片段(无则置空串)+ 一条 replace 链」,不内联成段提示词。
         """
-        # 全程工具调用汇总:跨所有轮次(不受 window 限制),供"曾调用过某工具"类 rubric 跨轮判定。
+        # 全程工具调用证据:跨所有轮次(不受 window 限制),供"曾调用过某工具"类 rubric 跨轮判定。
+        # 优先给"完整轨迹文件指针"(evaluator 按需读取,省上下文);推不了文件时回退内联汇总。
+        if trajectory_file:
+            all_tool_calls_body = (
+                f"完整轨迹文件已推进你的工作区:`{trajectory_file}`——含**全部轮次、未经截断**的 "
+                f"tool_call 入参与 output、以及产物文件记录。请用你的文件读取工具打开该文件,"
+                f"据其核对全程工具调用(判定跨轮 rubric 时尤为重要),不要仅凭最近 {window} 轮证据判负。"
+            )
+        else:
+            all_tool_calls_body = trajectory.render_all_tool_calls()
         all_tool_calls_section = "\n\n" + (
             _SECTIONS["all_tool_calls"]
             .replace("{window}", str(window))
-            .replace("{all_tool_calls}", trajectory.render_all_tool_calls())
+            .replace("{all_tool_calls}", all_tool_calls_body)
         )
 
         # 产物文件片段:无产物→空串;有则前置空行与正文隔开。
