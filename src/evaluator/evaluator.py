@@ -455,12 +455,9 @@ class Evaluator:
 
         # 投递(b):把磁盘真相文件推进 evaluator 自己的工作区,供其用工具就地核验
         await self._push_review_files(current_turn)
-        # 投递(b'):把完整轨迹(全部轮次、未截断 tool_call/output)推进工作区,供 evaluator 按需读取,
-        # 替代把全程 tool_call 整段内联进 prompt(缓解上下文长度压力);推不了则回退内联汇总。
-        trajectory_file = await self._push_trajectory_file(trajectory)
 
         # 投递(a):origin_query + rubrics + 最近 window 轮 + 产物指针(不投全量历史/不投自身旧判词)
-        prompt = self._build_prompt(trajectory, rubric, window, trajectory_file=trajectory_file)
+        prompt = self._build_prompt(trajectory, rubric, window)
         prompt_chars = len(prompt)  # token 代理量,供 eval_step 实验对比开销
 
         # 直接复用各 client 的 agent.execute:追加 schema 后缀 → 解析 JSON。
@@ -564,26 +561,6 @@ class Evaluator:
         except Exception as e:  # noqa: BLE001
             logger.debug("evaluator 会话 reset 失败(降级继续): %s", e)
 
-    async def _push_trajectory_file(self, trajectory: Trajectory) -> Optional[str]:
-        """把当前完整轨迹(全部轮次、未截断 tool_call/output)推进 evaluator 工作区。
-
-        返回工作区相对路径供提示词引用;无 gateway 或推送失败则返回 None(回退内联全程汇总)。
-        动机(检视意见):既然已有完整轨迹,不必把全程 tool_call 整段内联进 prompt——
-        以文件按需查阅替代,显著缓解上下文长度压力,且证据不因截断而丢失。
-        """
-        gateway = getattr(self.client, "gateway", None)
-        if gateway is None:
-            return None
-        dest = f"{self.config.review_subdir}/trajectory.json"
-        try:
-            await gateway.agents_files_set(
-                self.config.agent_name, dest, trajectory.model_dump_json(indent=2)
-            )
-            return dest
-        except Exception as e:  # noqa: BLE001
-            logger.debug("推进轨迹文件失败,回退内联全程汇总: %s", e)
-            return None
-
     async def _push_review_files(self, turn: TurnRecord) -> None:
         gateway = getattr(self.client, "gateway", None)
         if gateway is None:
@@ -602,7 +579,6 @@ class Evaluator:
         trajectory: Trajectory,
         rubric: Optional[list[Rubric]] = None,
         window: int = 1,
-        trajectory_file: Optional[str] = None,
     ) -> str:
         """构建压缩投喂:origin_query + 最近 window 轮(含 tool_calls)+ 产物指针 + rubrics。
 
@@ -612,20 +588,11 @@ class Evaluator:
         文案全部外置到 evaluator_user_prompt.md(_SECTIONS);本方法只做「算占位符值 +
         选片段(无则置空串)+ 一条 replace 链」,不内联成段提示词。
         """
-        # 全程工具调用证据:跨所有轮次(不受 window 限制),供"曾调用过某工具"类 rubric 跨轮判定。
-        # 优先给"完整轨迹文件指针"(evaluator 按需读取,省上下文);推不了文件时回退内联汇总。
-        if trajectory_file:
-            all_tool_calls_body = (
-                f"完整轨迹文件已推进你的工作区:`{trajectory_file}`——含**全部轮次、未经截断**的 "
-                f"tool_call 入参与 output、以及产物文件记录。请用你的文件读取工具打开该文件,"
-                f"据其核对全程工具调用(判定跨轮 rubric 时尤为重要),不要仅凭最近 {window} 轮证据判负。"
-            )
-        else:
-            all_tool_calls_body = trajectory.render_all_tool_calls()
+        # 全程工具调用汇总:跨所有轮次(不受 window 限制),供"曾调用过某工具"类 rubric 跨轮判定。
         all_tool_calls_section = "\n\n" + (
             _SECTIONS["all_tool_calls"]
             .replace("{window}", str(window))
-            .replace("{all_tool_calls}", all_tool_calls_body)
+            .replace("{all_tool_calls}", trajectory.render_all_tool_calls())
         )
 
         # 产物文件片段:无产物→空串;有则前置空行与正文隔开。
