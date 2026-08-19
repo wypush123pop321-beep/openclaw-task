@@ -1,0 +1,44 @@
+{
+  "system": {
+    "platform": [
+      "linux"
+    ],
+    "python": "3.12",
+    "tools": []
+  },
+  "input_dir": {
+    "skill_dir": "skills",
+    "agent_dir": "agents",
+    "user_dir": {
+      "path": "environments/024786_w3_基础前端_bounce_newton_69e7f61e",
+      "profile_file": "user_profile.json",
+      "map_file": null
+    }
+  },
+  "agents": [
+    {
+      "name": "assistant1",
+      "config": [
+        "TOOLS.md"
+      ],
+      "skills": [
+        "find-skills",
+        "skill-scope"
+      ],
+      "model": "deepseek-v4-pro"
+    }
+  ],
+  "queries": [
+    {
+      "agent_name": "assistant1",
+      "text": "帮我做一个5颗钢珠的科技馆展品牛顿摆动画演示页,5颗钢球悬挂成一排,拉起最左边2颗到约25度松手,右边等数量的球弹出,如此往复。可点击重新拉起,带轻微声效提示也行。要求:动量传递方向与数量正确;中间球基本静止。320px到768px宽度下不变形、无横向滚动。",
+      "use_simulator": true,
+      "session_name": "query1",
+      "timeout": 3600
+    }
+  ],
+  "gateway_ws_url": "ws://127.0.0.1:18789/gateway",
+  "api_key": null,
+  "workspace_base": "~/.openclaw/workspace",
+  "simulator_config": "configs/user_proxy_model.json"
+}

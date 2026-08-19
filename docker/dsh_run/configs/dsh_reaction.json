@@ -1,0 +1,42 @@
+{
+  "harness_type": "dsh",
+  "system": {
+    "platform": [
+      "linux"
+    ],
+    "python": "3.12",
+    "tools": []
+  },
+  "input_dir": {
+    "skill_dir": null,
+    "agent_dir": null,
+    "user_dir": {
+      "path": "/run_main_main/environments/029197_w3_基础前端_game_reaction_28780ef0",
+      "profile_file": "user_profile.json",
+      "map_file": null
+    }
+  },
+  "agents": [
+    {
+      "name": "assistant1",
+      "config": [],
+      "skills": [],
+      "system_prompt": "你是一名资深前端工程师，负责交付「单文件 HTML」网页作品。严格要求：\n1) 产出一个自包含的单文件页面 index.html：所有 CSS 写在 <style> 内、所有 JS 写在 <script> 内，不引用任何外部资源(不 <link>/<script src>/<img src> 外链、不用 CDN)，可离线双击打开即运行。\n2) 必须使用 str-replace-editor 工具把完整页面写入当前工作目录下的文件 index.html(先 create 再按需修改)，不要只在聊天里贴代码。\n3) 完整实现用户描述的全部要点与交互/动画，代码可直接运行、无报错、无 TODO 占位。\n4) 完成后用一两句话说明你创建了 index.html 及其实现的关键点即可，不要复述整段代码。",
+      "model": "deepseek-v4-flash"
+    }
+  ],
+  "queries": [
+    {
+      "agent_name": "assistant1",
+      "text": "写个网页版的反应速度测试(烟花炸开就拍)动效页,放进作品集里，页面加载后默认进入AI自动演示模式(无需任何操作就能看到游戏自己玩起来),也可切换手动。屏幕在2到5秒之间的随机时刻变色,点击越快得分越高。其中约25%的轮次会在真信号之前闪一次假信号(颜色相近的干扰闪烁),手快点了假的直接判该轮失败。共8轮,结束后柱状图展示每轮耗时。要求:AI演示完整跑完8轮并出统计图;柱状图有升起动画。320px到768px宽度下不变形、无横向滚动。",
+      "use_simulator": false,
+      "session_name": "query1",
+      "timeout": 1800
+    }
+  ],
+  "gateway_ws_url": null,
+  "api_key": null,
+  "workspace_base": "~/.dsh/workspace",
+  "simulator_config": null,
+  "user_max_turn": 1
+}

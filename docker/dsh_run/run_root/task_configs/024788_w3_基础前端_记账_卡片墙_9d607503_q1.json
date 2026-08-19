@@ -1,0 +1,44 @@
+{
+  "system": {
+    "platform": [
+      "linux"
+    ],
+    "python": "3.12",
+    "tools": []
+  },
+  "input_dir": {
+    "skill_dir": "skills",
+    "agent_dir": "agents",
+    "user_dir": {
+      "path": "environments/024788_w3_基础前端_记账_卡片墙_9d607503",
+      "profile_file": "user_profile.json",
+      "map_file": null
+    }
+  },
+  "agents": [
+    {
+      "name": "assistant1",
+      "config": [
+        "TOOLS.md"
+      ],
+      "skills": [
+        "find-skills",
+        "skill-scope"
+      ],
+      "model": "deepseek-v4-pro"
+    }
+  ],
+  "queries": [
+    {
+      "agent_name": "assistant1",
+      "text": "弄个发手机上就发群里能看的网页，把这个月餐饮、交通、购物、房租几块支出摆成卡片，左划一下去掉某张。",
+      "use_simulator": true,
+      "session_name": "query1",
+      "timeout": 3600
+    }
+  ],
+  "gateway_ws_url": "ws://127.0.0.1:18789/gateway",
+  "api_key": null,
+  "workspace_base": "~/.openclaw/workspace",
+  "simulator_config": "configs/user_proxy_model.json"
+}

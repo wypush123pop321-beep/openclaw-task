@@ -1,0 +1,44 @@
+{
+  "system": {
+    "platform": [
+      "linux"
+    ],
+    "python": "3.12",
+    "tools": []
+  },
+  "input_dir": {
+    "skill_dir": "skills",
+    "agent_dir": "agents",
+    "user_dir": {
+      "path": "environments/024824_w3_基础前端_副业_作品集页_63a3d4ef",
+      "profile_file": "user_profile.json",
+      "map_file": null
+    }
+  },
+  "agents": [
+    {
+      "name": "assistant1",
+      "config": [
+        "TOOLS.md"
+      ],
+      "skills": [
+        "find-skills",
+        "skill-scope"
+      ],
+      "model": "deepseek-v4-pro"
+    }
+  ],
+  "queries": [
+    {
+      "agent_name": "assistant1",
+      "text": "我需要个副业试运营流程的能打开就行的网页，边滚边把内容带出来",
+      "use_simulator": true,
+      "session_name": "query1",
+      "timeout": 3600
+    }
+  ],
+  "gateway_ws_url": "ws://127.0.0.1:18789/gateway",
+  "api_key": null,
+  "workspace_base": "~/.openclaw/workspace",
+  "simulator_config": "configs/user_proxy_model.json"
+}

@@ -1,0 +1,7 @@
+# 运行产物(体量大、含 root 属主的 .sessions 轨迹)——不入库
+out/
+out_real/
+# 运行期生成、含真实 API key 的 simulator 配置——绝不入库
+run_root/configs/user_proxy_model.json
+# DSH runtime 会话目录(如果落在别处)
+**/.sessions/
