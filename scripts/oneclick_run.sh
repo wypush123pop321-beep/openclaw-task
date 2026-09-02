@@ -144,17 +144,19 @@ PY
     CFG_KEY="$API_KEY"
   fi
 fi
-case "$CFG_KEY" in
-  ""|*"<"*|*占位*|*placeholder*|*PLACEHOLDER*)
-    bad "user_proxy_model.json 的 api_key 缺失/仍是占位符,请用 --api-key <key> 提供" ;;
-esac
-ok "yibuapi api-key 就绪"
-warn "若换的是模型 key,请确认 C:\\Users\\<user>\\.openclaw\\openclaw.json 的 models.providers.anthropic.apiKey 同步为同一 key"
+if [[ -z "$CFG_KEY" || "$CFG_KEY" == *"<"* || "$CFG_KEY" == *占位* \
+      || "$CFG_KEY" == *placeholder* || "$CFG_KEY" == *PLACEHOLDER* ]]; then
+  bad "user_proxy_model.json 的 api_key 缺失/仍是占位符,请用 --api-key <key> 提供"
+else
+  ok "yibuapi api-key 就绪"
+  warn "若换的是模型 key,请确认 C:\\Users\\<user>\\.openclaw\\openclaw.json 的 models.providers.anthropic.apiKey 同步为同一 key"
+fi
 
 # obs 清单:优先已生成;--refresh 或缺清单时用 obsutil ls 重建
+# (重建不依赖全局 FAIL 状态:即便 api-key 等前置校验没过,只要 obsutil 可用就重建,
+#  避免"缺清单却不重建"的假阴性问题)
 if [ "$REFRESH" = 1 ] || [ ! -f "$OBS_LIST" ]; then
-  [ -n "$OBSUTIL" ] && [ -f "$OBSUTIL" ] || { bad "无法重建清单:obsutil 不可用"; }
-  if [ "$FAIL" = 0 ]; then
+  if [ -n "$OBSUTIL" ] && [ -f "$OBSUTIL" ]; then
     say "用 obsutil 重扫 obs 源生成清单 ..."
     HTTP_PROXY="$PROXY" HTTPS_PROXY="$PROXY" "$OBSUTIL" ls "$OBS_PREFIX/" > "$ROOT/tasks_obs.raw.txt" 2>&1 \
       || bad "obsutil ls 失败(网络/代理?源: $OBS_PREFIX)"
@@ -183,11 +185,19 @@ out.write_text("\n".join(sorted(names)) + "\n", encoding="utf-8")
 print(f"[oneclick] tasks_obs.txt 重建: {len(names)} 个任务")
 PY
     rm -f "$ROOT/tasks_obs.raw.txt"
+  else
+    bad "无法重建清单:obsutil 不可用(用 WCX_OBSUTIL 指定,或装到默认位)"
   fi
 fi
 need_file "$OBS_LIST"
-OBS_TOTAL=$(python -c "print(len([l for l in open(r'$OBS_LIST',encoding='utf-8') if l.strip()]))")
-ok "obs 清单 $OBS_TOTAL 个任务"
+# 清单缺失时 need_file 已置 FAIL=1,但脚本不退出;此处避免对不存在文件 open 抛 traceback,
+# 统计留给下面 [ "$FAIL" = 1 ] 统一拦截
+if [ -f "$OBS_LIST" ]; then
+  OBS_TOTAL=$(python -c "print(len([l for l in open(r'$OBS_LIST',encoding='utf-8') if l.strip()]))")
+  ok "obs 清单 $OBS_TOTAL 个任务"
+else
+  OBS_TOTAL=0
+fi
 
 # 区间校验
 if [ -n "$START" ]; then
