@@ -1,13 +1,7 @@
 {
   "user_simulator": {
     "model": "gemini-3-flash-preview",
-    "base_url": "http://192.168.30.95:8084",
-    "api_key": "xxxxx"
-  },
-  "evaluator": {
-    "model":"deepseek-v4-flash",
-    "base_url": "http://192.168.30.95:8084",
-    "api_key": "user-key",
-    "api": "openai-completions"
+    "base_url": "https://yibuapi.com/v1",
+    "api_key": "<yibu-api-key: 真值仅本机, 见 configs/local.env / 文档 §3.5>"
   }
 }

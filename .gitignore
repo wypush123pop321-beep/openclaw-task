@@ -1,1 +1,27 @@
-__pycache__/*
+__pycache__/
+*.pyc
+
+# 本机私有凭据(真值仅本机,净化提交后留此;被 scripts/local_env.py 加载)
+configs/local.env
+
+# 批跑运行产物(可再生成,不入库)
+configs/wcx_260827/
+configs/allrub_260822/
+outputs/
+logs/
+environments/
+tmp_dl/
+
+# 任务清单/日志(运行时生成)
+tasks_obs.txt
+tasks_download.txt
+tasks_done.txt
+tasks_pending.txt
+tasks_pending.bak_*.txt
+*.log
+batch_run*.log
+relay_*.log
+gateway_run.log
+download_batch_run.log
+evaluator_use.log
+api_use.log
