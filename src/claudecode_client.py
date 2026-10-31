@@ -539,9 +539,20 @@ class ClaudecodeAgentManager:
         self.client = client
         self.workspace_manager = workspace_manager
         self.agent_overrides: Dict[str, AgentModelConfig] = agent_overrides or {}
+        # deliver_system_prompt 收下的系统提示词,register_agent_defaults 时取用
+        self.system_prompts: Dict[str, str] = {}
 
-    async def setup_agent(self, agent_config) -> None:
+    def deliver_system_prompt(self, agent_name: str, prompt: str, source: str) -> None:
+        """三 harness 同名的下发方法(轻收拢,无基类)。
+
+        ClaudeCode 经 SDK register_agent_defaults 下发:此处先收下,setup_agent 注册时取用。
+        """
+        self.system_prompts[agent_name] = prompt
+
+    async def setup_agent(self, agent_config, resolved_prompt: Optional[tuple] = None) -> None:
         agent_name = agent_config.name
+        if resolved_prompt is not None:
+            self.deliver_system_prompt(agent_name, resolved_prompt[0], resolved_prompt[1])
         override = self.agent_overrides.get(agent_name)
         if override:
             warn_agent_model_conflict(agent_name, agent_config.model, override)
@@ -567,9 +578,11 @@ class ClaudecodeAgentManager:
             # 只读 project 段(通常不存在) → user 段完全跳过 → env 注入生效
             extra_options["setting_sources"] = ["project"]
 
+        # 系统提示词:优先用 deliver 收下的解析结果(含 auto_gen 变异 / 默认兜底),回退配置原字段
+        effective_prompt = self.system_prompts.get(agent_name) or getattr(agent_config, "system_prompt", None)
         self.client.register_agent_defaults(
             agent_name=agent_name,
-            system_prompt=getattr(agent_config, "system_prompt", None),
+            system_prompt=effective_prompt,
             model=effective_model,
             cwd=workspace,
             permission_mode="bypassPermissions",

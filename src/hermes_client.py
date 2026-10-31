@@ -593,9 +593,20 @@ class HermesAgentManager:
         self.client = client
         self.workspace_manager = workspace_manager
         self.agent_overrides: Dict[str, AgentModelConfig] = agent_overrides or {}
+        # deliver_system_prompt 收下的系统提示词;Hermes agent 惰性构造,get_agent 工厂时取用
+        self.system_prompts: Dict[str, str] = {}
 
-    async def setup_agent(self, agent_config) -> None:
+    def deliver_system_prompt(self, agent_name: str, prompt: str, source: str) -> None:
+        """三 harness 同名的下发方法(轻收拢,无基类)。
+
+        Hermes 的 agent 在 get_agent 时才惰性构造,故此处先收下,由 make_hermes_get_agent 取用。
+        """
+        self.system_prompts[agent_name] = prompt
+
+    async def setup_agent(self, agent_config, resolved_prompt: Optional[tuple] = None) -> None:
         agent_name = agent_config.name
+        if resolved_prompt is not None:
+            self.deliver_system_prompt(agent_name, resolved_prompt[0], resolved_prompt[1])
         override = self.agent_overrides.get(agent_name)
         if override:
             warn_agent_model_conflict(agent_name, agent_config.model, override)
@@ -653,9 +664,15 @@ def make_hermes_get_agent(
     client: HermesClient,
     workspace_manager: Optional[HermesWorkspaceManager] = None,
     agent_overrides: Optional[Dict[str, AgentModelConfig]] = None,
+    system_prompts: Optional[Dict[str, str]] = None,
 ):
-    """返回 hermes 专用的 get_agent_fn 闭包 (含 hermes_home + model_override 注入)"""
+    """返回 hermes 专用的 get_agent_fn 闭包 (含 hermes_home + model_override + system_prompt 注入)。
+
+    system_prompts: {agent_name: 系统提示词} —— 统一解析器产出(含 auto_gen 变异 / 默认兜底)。
+    Hermes 的 agent 在 get_agent 时惰性构造,故系统提示词在此注入(此前从未传该字段,一并修复)。
+    """
     overrides = agent_overrides or {}
+    prompts = system_prompts or {}
 
     def get_agent(agent_name: str, session_name: str):
         hermes_home = (
@@ -664,6 +681,7 @@ def make_hermes_get_agent(
         )
         return client.get_agent(
             agent_name, session_name,
+            system_prompt=prompts.get(agent_name),
             hermes_home=hermes_home,
             model_override=overrides.get(agent_name),
         )

@@ -30,6 +30,10 @@ from openclaw_sdk.gateway.protocol import ProtocolGateway
 
 from src.workspace import BaseWorkspaceManager, copy_path
 from src.config import AgentModelConfig, warn_agent_model_conflict
+from src.system_prompt import SOURCE_AUTO_GEN, SOURCE_CONFIG, SOURCE_DEFAULT
+
+# 网关把 workspace 引导文件截断后注入系统提示词 Project Context 段的默认上限
+_BOOTSTRAP_MAX_CHARS = 20000
 
 logger = logging.getLogger("harness_automation")
 
@@ -489,7 +493,7 @@ class OpenclawAgentManager:
         self.workspace_manager = workspace_manager
         self.agent_overrides: Dict[str, AgentModelConfig] = agent_overrides or {}
 
-    async def setup_agent(self, agent_config) -> None:
+    async def setup_agent(self, agent_config, resolved_prompt: Optional[tuple] = None) -> None:
         agent_name = agent_config.name
         override = self.agent_overrides.get(agent_name)
         if override:
@@ -498,6 +502,11 @@ class OpenclawAgentManager:
             logger.info("设置 Agent: %s | model=%s", agent_name, agent_config.model)
         else:
             logger.info("设置 Agent: %s", agent_name)
+
+        # 系统提示词下发(OpenClaw 唯一通道:workspace SOUL.md)。
+        # 在建 agent / 铺文件之后写,显式意图覆盖文件版,默认分支不 clobber(见 change design D4)。
+        if resolved_prompt is not None:
+            self.deliver_system_prompt(agent_name, resolved_prompt[0], resolved_prompt[1])
 
         # 预设Agent:evaluator
         existing_ids = {a.agent_id for a in await self.client.list_agents()}
@@ -520,6 +529,36 @@ class OpenclawAgentManager:
         model = (override.resolved_model if override and override.model else agent_config.model)
         if model:
             await self._pin_model(agent_name, model, has_endpoint_info=bool(override))
+
+    def deliver_system_prompt(self, agent_name: str, prompt: str, source: str) -> None:
+        """把解析出的系统提示词下发到 OpenClaw 的生效通道:写 agent workspace 的 SOUL.md。
+
+        三 harness 同名的下发方法(轻收拢,无基类);OpenClaw 的下发是立即写文件。
+
+        防覆盖规则(design D4):
+        - auto_gen / config(显式意图)→ 总是写,覆盖 _setup_workspaces 拷来的文件版并告警;
+        - default(system_prompt 为空)→ 仅当尚无 SOUL.md 时才写默认兜底,已有则保留(等同现状)。
+        """
+        workspace = self.workspace_manager.get_agent_workspace(agent_name)
+        soul = workspace / "SOUL.md"
+
+        if source == SOURCE_DEFAULT and soul.exists():
+            logger.info("agent '%s' 已有 SOUL.md,保留文件版人设(默认分支不覆盖)", agent_name)
+            return
+
+        if len(prompt) > _BOOTSTRAP_MAX_CHARS:
+            logger.warning(
+                "agent '%s' 系统提示词 %d 字符,超过 bootstrapMaxChars(%d),网关会截断",
+                agent_name, len(prompt), _BOOTSTRAP_MAX_CHARS,
+            )
+
+        existed = soul.exists()
+        soul.parent.mkdir(parents=True, exist_ok=True)
+        soul.write_text(prompt, encoding="utf-8")
+        if existed and source in (SOURCE_AUTO_GEN, SOURCE_CONFIG):
+            logger.info("agent '%s' 以 %s 系统提示词覆盖既有 SOUL.md", agent_name, source)
+        else:
+            logger.info("agent '%s' 写入 SOUL.md(source=%s)", agent_name, source)
 
     async def _pin_model(
         self,
